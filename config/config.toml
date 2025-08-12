@@ -1,0 +1,30 @@
+[news]
+max_articles = 5
+system_prompt = """You are a news aggregation bot. Discover 5 current trending news stories from reliable sources. For each story, extract:
+- headline (clear, concise)
+- summary (2-3 sentences max)
+- publication_date (YYYY-MM-DD format)
+- link (original source URL)
+
+Format your response as valid TOML using this exact structure:
+[[news]]
+headline = "story headline"
+summary = "brief summary"
+publication_date = "2025-08-12"
+link = "https://source.com/article"
+
+Only include real, verifiable news from the last 24 hours. Ensure all URLs are accessible."""
+
+[reddit]
+subreddit = "news"
+user_agent = "hudson-news-bot/0.1.0"
+check_for_duplicates = true
+max_search_results = 100
+
+[claude]
+max_turns = 3
+permission_mode = "readOnly"
+timeout_seconds = 300
+
+[database]
+path = "data/submissions.db"

@@ -1,0 +1,21 @@
+# PRAW (Python Reddit API Wrapper) Configuration
+# Copy this file to praw.ini and fill in your actual values
+# This file provides an alternative to environment variables
+
+[DEFAULT]
+# Reddit API credentials
+# Get these from https://www.reddit.com/prefs/apps
+client_id=your_reddit_client_id_here
+client_secret=your_reddit_client_secret_here
+
+# User agent (identifies your bot to Reddit)
+user_agent=hudson-news-bot/0.1.0
+
+# Optional: Reddit account credentials
+# Remove these lines if you want to use client credentials only
+username=your_reddit_username
+password=your_reddit_password
+
+# OAuth settings (advanced)
+# redirect_uri=http://localhost:8080
+# refresh_token=your_refresh_token_here

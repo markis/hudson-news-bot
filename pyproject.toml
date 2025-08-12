@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hudson-news-bot"
+version = "0.1.0"
+description = "News aggregation bot with Reddit integration using Claude SDK"
+requires-python = ">=3.12"
+dependencies = [
+    "claude-code-sdk",
+    "praw",
+    "tomli-w"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "mypy",
+    "ruff",
+    "bandit"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hudson_news_bot"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+
+[tool.ruff]
+target-version = "py312"
+src = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "--cov=hudson_news_bot",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
