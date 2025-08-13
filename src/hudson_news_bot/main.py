@@ -122,7 +122,7 @@ class NewsBot:
         Returns:
             List of unique news items
         """
-        unique_items = []
+        unique_items: list[NewsItem] = []
 
         for news_item in news_collection:
             is_duplicate, reason = self.deduplicator.is_duplicate(news_item)
@@ -188,12 +188,11 @@ async def main() -> None:
     logger = get_logger("main")
 
     try:
-        # Load configuration
-        config = Config(args.config)
+        max_articles = str(args.max_articles)
+        int_max_articles = int(max_articles) if max_articles.isnumeric() else None
 
-        # Override max articles if specified
-        if args.max_articles:
-            config._data.setdefault("news", {})["max_articles"] = args.max_articles
+        # Load configuration
+        config = Config(args.config, int_max_articles)
 
         # Initialize bot
         bot = NewsBot(config)

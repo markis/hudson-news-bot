@@ -4,9 +4,9 @@ import sys
 import time
 from typing import Any, List, Optional
 
-import praw  # type: ignore
-from praw.exceptions import RedditAPIException, PRAWException  # type: ignore
-from praw.models import Submission  # type: ignore
+import praw
+from praw.exceptions import RedditAPIException, PRAWException
+from praw.models import Submission
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsItem
@@ -132,7 +132,7 @@ class RedditClient:
         news_items: List[NewsItem],
         dry_run: bool = False,
         delay_between_posts: int = 60,
-    ) -> List[Optional[Submission]]:
+    ) -> list[Submission | None]:
         """Submit multiple news items with rate limiting.
 
         Args:
@@ -143,7 +143,7 @@ class RedditClient:
         Returns:
             List of submission objects (None for failed submissions)
         """
-        submissions = []
+        submissions: list[Submission | None] = []
 
         for i, news_item in enumerate(news_items):
             if i > 0 and not dry_run:
@@ -155,9 +155,10 @@ class RedditClient:
             submission = self.submit_news_item(news_item, dry_run=dry_run)
             submissions.append(submission)
 
-        successful_count = sum(1 for s in submissions if s is not None)
+        success_count = sum(1 for s in submissions if s is not None)
+
         self.logger.info(
-            f"Submitted {successful_count}/{len(news_items)} articles successfully"
+            f"Submitted {success_count}/{len(news_items)} articles successfully"
         )
 
         return submissions

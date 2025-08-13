@@ -5,7 +5,7 @@ import sqlite3
 import urllib.parse
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import Any
 
 
 from hudson_news_bot.config.settings import Config
@@ -163,7 +163,7 @@ class DuplicationChecker:
 
         return normalized
 
-    def is_duplicate(self, news_item: NewsItem) -> Tuple[bool, Optional[str]]:
+    def is_duplicate(self, news_item: NewsItem) -> tuple[bool, str | None]:
         """Check if news item is a duplicate.
 
         Args:
@@ -191,7 +191,7 @@ class DuplicationChecker:
 
         return False, None
 
-    def _check_local_database(self, news_item: NewsItem) -> Tuple[bool, Optional[str]]:
+    def _check_local_database(self, news_item: NewsItem) -> tuple[bool, str | None]:
         """Check local database for duplicates.
 
         Args:
@@ -237,9 +237,7 @@ class DuplicationChecker:
 
         return False, None
 
-    def _check_reddit_submissions(
-        self, news_item: NewsItem
-    ) -> Tuple[bool, Optional[str]]:
+    def _check_reddit_submissions(self, news_item: NewsItem) -> tuple[bool, str | None]:
         """Check Reddit for existing submissions.
 
         Args:
@@ -333,7 +331,7 @@ class DuplicationChecker:
         return False
 
     def store_submission(
-        self, news_item: NewsItem, submission_id: Optional[str] = None
+        self, news_item: NewsItem, submission_id: str | None = None
     ) -> None:
         """Store submission in local database.
 
@@ -346,7 +344,7 @@ class DuplicationChecker:
     def _store_submission(
         self,
         news_item: NewsItem,
-        submission_id: Optional[str] = None,
+        submission_id: str | None = None,
         source: str = "local",
     ) -> None:
         """Store submission in database.

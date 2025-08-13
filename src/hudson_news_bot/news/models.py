@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Iterator, List
+from typing import Iterator
 
 import tomli_w
 
@@ -26,11 +26,15 @@ class NewsItem:
         }
 
 
+def default_news_list() -> "list[NewsItem]":
+    return list()
+
+
 @dataclass
 class NewsCollection:
     """Collection of news items with TOML serialization support."""
 
-    news: List[NewsItem] = field(default_factory=list)
+    news: list[NewsItem] = field(default_factory=default_news_list)
 
     def to_toml_string(self) -> str:
         """Convert collection to TOML string format."""

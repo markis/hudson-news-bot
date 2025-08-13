@@ -3,44 +3,12 @@
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Final
 
 from hudson_news_bot.utils.toml_handler import TOMLHandler
 
-
-class Config:
-    """Configuration management using TOML files and environment variables."""
-
-    def __init__(self, config_path: Optional[str | Path] = None):
-        """Initialize configuration.
-
-        Args:
-            config_path: Path to configuration file. Defaults to config/config.toml
-        """
-        if config_path is None:
-            # Default to config/config.toml relative to project root
-            project_root = Path(__file__).parent.parent.parent.parent
-            config_path = project_root / "config" / "config.toml"
-
-        self.config_path = Path(config_path)
-        self._data: Dict[str, Any] = {}
-        self._load_config()
-
-    def _load_config(self) -> None:
-        """Load configuration from TOML file."""
-        try:
-            self._data = TOMLHandler.load_config(self.config_path)
-        except FileNotFoundError:
-            # Create default config if it doesn't exist
-            self._create_default_config()
-            self._data = TOMLHandler.load_config(self.config_path)
-
-    def _create_default_config(self) -> None:
-        """Create a default configuration file."""
-        default_config = {
-            "news": {
-                "max_articles": 5,
-                "system_prompt": """You are a news aggregation bot. Discover 5 current trending news stories from reliable sources. For each story, extract:
+DEFAULT_SYSTEM_PROMPT: Final = """
+You are a news aggregation bot. Discover 5 current trending news stories from reliable sources. For each story, extract:
 - headline (clear, concise)
 - summary (2-3 sentences max)
 - publication_date (YYYY-MM-DD format)
@@ -53,7 +21,51 @@ summary = "brief summary"
 publication_date = "2025-08-12"
 link = "https://source.com/article"
 
-Only include real, verifiable news from the last 24 hours. Ensure all URLs are accessible.""",
+Only include real, verifiable news from the last 24 hours. Ensure all URLs are accessible.
+"""
+
+
+class Config:
+    """Configuration management using TOML files and environment variables."""
+
+    config_path: Path
+    _data: Final[dict[str, Any]]
+    _max_articles: Final[int]
+
+    def __init__(
+        self,
+        config_path: str | Path | None = None,
+        max_articles: int | None = None,
+    ) -> None:
+        """Initialize configuration.
+
+        Args:
+            config_path: Path to configuration file. Defaults to config/config.toml
+        """
+        if config_path is None:
+            # Default to config/config.toml relative to project root
+            project_root = Path(__file__).parent.parent.parent.parent
+            config_path = project_root / "config" / "config.toml"
+
+        self.config_path = Path(config_path)
+        self._data = {}
+        try:
+            self._data = TOMLHandler.load_config(self.config_path)
+        except FileNotFoundError:
+            # Create default config if it doesn't exist
+            self._create_default_config()
+            self._data = TOMLHandler.load_config(self.config_path)
+
+        if max_articles is None:
+            max_articles = int(self._data.get("news", {}).get("max_articles", 5))
+        self._max_articles = max_articles
+
+    def _create_default_config(self) -> None:
+        """Create a default configuration file."""
+        default_config = {
+            "news": {
+                "max_articles": 5,
+                "system_prompt": DEFAULT_SYSTEM_PROMPT,
             },
             "reddit": {
                 "subreddit": "news",
@@ -85,7 +97,7 @@ Only include real, verifiable news from the last 24 hours. Ensure all URLs are a
     @property
     def max_articles(self) -> int:
         """Get maximum number of articles to aggregate."""
-        return int(self._data.get("news", {}).get("max_articles", 5))
+        return self._max_articles
 
     @property
     def system_prompt(self) -> str:
@@ -130,27 +142,27 @@ Only include real, verifiable news from the last 24 hours. Ensure all URLs are a
         return str(self._data.get("database", {}).get("path", "data/submissions.db"))
 
     @property
-    def anthropic_api_key(self) -> Optional[str]:
+    def anthropic_api_key(self) -> str | None:
         """Get Anthropic API key from environment."""
         return os.getenv("ANTHROPIC_API_KEY")
 
     @property
-    def reddit_client_id(self) -> Optional[str]:
+    def reddit_client_id(self) -> str | None:
         """Get Reddit client ID from environment."""
         return os.getenv("REDDIT_CLIENT_ID")
 
     @property
-    def reddit_client_secret(self) -> Optional[str]:
+    def reddit_client_secret(self) -> str | None:
         """Get Reddit client secret from environment."""
         return os.getenv("REDDIT_CLIENT_SECRET")
 
     @property
-    def reddit_username(self) -> Optional[str]:
+    def reddit_username(self) -> str | None:
         """Get Reddit username from environment."""
         return os.getenv("REDDIT_USERNAME")
 
     @property
-    def reddit_password(self) -> Optional[str]:
+    def reddit_password(self) -> str | None:
         """Get Reddit password from environment."""
         return os.getenv("REDDIT_PASSWORD")
 
@@ -160,7 +172,7 @@ Only include real, verifiable news from the last 24 hours. Ensure all URLs are a
         Returns:
             Tuple of (is_valid, list_of_errors)
         """
-        errors = []
+        errors: list[str] = []
 
         # Check configuration file exists
         if not self.config_path.exists():

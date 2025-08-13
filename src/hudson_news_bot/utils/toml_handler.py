@@ -27,7 +27,7 @@ class TOMLHandler:
         """Parse TOML content into NewsCollection."""
         try:
             data = tomllib.loads(toml_content)
-            news_items = []
+            news_items: list[NewsItem] = []
 
             for item_data in data.get("news", []):
                 # Parse date

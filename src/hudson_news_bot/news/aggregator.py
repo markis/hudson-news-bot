@@ -46,14 +46,15 @@ class NewsAggregator:
         )
 
         async with ClaudeSDKClient(options=self.options) as client:
-            response_content = None
+            response_content = ""
             prompt = self._create_aggregation_prompt()
             self.logger.debug(f"Sending prompt to Claude: {prompt}")
 
             # Start the conversation
-            async for message in client.query(prompt):  # type: ignore
-                if message.type == "text":
-                    response_content = message.content
+            await client.query(prompt)
+            async for message in client.receive_response():
+                if content := getattr(message, "content", None):
+                    response_content = content
                     break
 
             # Parse the response
@@ -152,18 +153,17 @@ async def test_connection() -> bool:
 
         async with ClaudeSDKClient(options=aggregator.options) as client:
             # Simple test query
-            async for message in client.query(
-                "Please respond with just 'OK' to confirm connection."
-            ):  # type: ignore
-                if message.type == "text" and "OK" in message.content:
+            await client.query("Please respond with just 'OK' to confirm connection.")
+            async for message in client.receive_response():
+                if (content := getattr(message, "content", None)) and "OK" in content:
                     logger.info("✅ Claude SDK connection successful")
                     return True
 
         logger.warning("⚠️ Claude SDK connection test inconclusive")
         return False
 
-    except Exception as e:
-        logger.error(f"❌ Claude SDK connection failed: {e}")
+    except Exception:
+        logger.exception("❌ Claude SDK connection failed")
         return False
 
 

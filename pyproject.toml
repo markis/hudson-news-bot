@@ -10,7 +10,8 @@ requires-python = ">=3.12"
 dependencies = [
     "claude-code-sdk",
     "praw",
-    "tomli-w"
+    "pytest-cov>=6.2.1",
+    "tomli-w",
 ]
 
 [project.optional-dependencies]
@@ -20,7 +21,8 @@ dev = [
     "pytest-asyncio",
     "mypy",
     "ruff",
-    "bandit"
+    "bandit",
+    "pyright"
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -40,4 +42,9 @@ addopts = [
     "--cov=hudson_news_bot",
     "--cov-report=term-missing",
     "--cov-report=html",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.403",
 ]
