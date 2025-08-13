@@ -173,6 +173,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "claude-code-sdk" },
+    { name = "mypy" },
     { name = "praw" },
     { name = "pytest-cov" },
     { name = "tomli-w" },
@@ -191,6 +192,7 @@ dev = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "mypy" },
     { name = "pyright" },
 ]
 
@@ -198,6 +200,7 @@ dev = [
 requires-dist = [
     { name = "bandit", marker = "extra == 'dev'" },
     { name = "claude-code-sdk" },
+    { name = "mypy", specifier = ">=1.17.1" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "praw" },
     { name = "pyright", marker = "extra == 'dev'" },
@@ -211,7 +214,10 @@ requires-dist = [
 provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pyright", specifier = ">=1.1.403" }]
+dev = [
+    { name = "mypy", specifier = ">=1.17.1" },
+    { name = "pyright", specifier = ">=1.1.403" },
+]
 
 [[package]]
 name = "idna"

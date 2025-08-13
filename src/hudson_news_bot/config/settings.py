@@ -28,7 +28,7 @@ Only include real, verifiable news from the last 24 hours. Ensure all URLs are a
 class Config:
     """Configuration management using TOML files and environment variables."""
 
-    config_path: Path
+    _config_path: Final[Path]
     _data: Final[dict[str, Any]]
 
     def __init__(
@@ -45,14 +45,17 @@ class Config:
             project_root = Path(__file__).parent.parent.parent.parent
             config_path = project_root / "config" / "config.toml"
 
-        self.config_path = Path(config_path)
-        self._data = {}
+        self._config_path = Path(config_path)
+        self._data = self._get_config_data(self._config_path)
+
+    def _get_config_data(self, config_path: Path) -> dict[str, Any]:
+        """Load configuration data from the specified TOML file."""
         try:
-            self._data = TOMLHandler.load_config(self.config_path)
+            return TOMLHandler.load_config(config_path)
         except FileNotFoundError:
             # Create default config if it doesn't exist
             self._create_default_config()
-            self._data = TOMLHandler.load_config(self.config_path)
+            return TOMLHandler.load_config(config_path)
 
     def _create_default_config(self) -> None:
         """Create a default configuration file."""
@@ -76,11 +79,11 @@ class Config:
         }
 
         # Ensure config directory exists
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
+        self._config_path.parent.mkdir(parents=True, exist_ok=True)
 
         import tomli_w
 
-        with open(self.config_path, "wb") as f:
+        with open(self._config_path, "wb") as f:
             tomli_w.dump(default_config, f)
 
     @property
@@ -169,8 +172,8 @@ class Config:
         errors: list[str] = []
 
         # Check configuration file exists
-        if not self.config_path.exists():
-            errors.append(f"Configuration file not found: {self.config_path}")
+        if not self._config_path.exists():
+            errors.append(f"Configuration file not found: {self._config_path}")
 
         # Validate required Reddit credentials
         if not self.reddit_client_id:

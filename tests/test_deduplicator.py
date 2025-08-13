@@ -12,7 +12,7 @@ from hudson_news_bot.reddit.deduplicator import DuplicationChecker
 class TestDuplicationChecker:
     """Test duplicate detection functionality."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         # Create mock Reddit client and config
         self.mock_reddit_client = MagicMock()
@@ -27,13 +27,13 @@ class TestDuplicationChecker:
         # Create checker instance
         self.checker = DuplicationChecker(self.mock_reddit_client, self.mock_config)
 
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         """Clean up test fixtures."""
         import shutil
 
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_normalize_url(self):
+    def test_normalize_url(self) -> None:
         """Test URL normalization."""
         # Test basic normalization
         url1 = "https://www.example.com/article"
@@ -52,7 +52,7 @@ class TestDuplicationChecker:
         normalized3 = self.checker._normalize_url(url3)
         assert normalized3 == "https://example.com/article"
 
-    def test_normalize_title(self):
+    def test_normalize_title(self) -> None:
         """Test title normalization."""
         # Test basic normalization
         title1 = "  Breaking:   Test   News  Story  "
@@ -69,7 +69,7 @@ class TestDuplicationChecker:
         normalized3 = self.checker._normalize_title(title3)
         assert normalized3 == "news story"
 
-    def test_urls_are_similar(self):
+    def test_urls_are_similar(self) -> None:
         """Test URL similarity detection."""
         url1 = "https://www.example.com/article"
         url2 = "https://example.com/article/"
@@ -80,7 +80,7 @@ class TestDuplicationChecker:
         assert self.checker._urls_are_similar(url1, url3) is True
         assert self.checker._urls_are_similar(url1, url4) is False
 
-    def test_titles_are_similar(self):
+    def test_titles_are_similar(self) -> None:
         """Test title similarity detection."""
         title1 = "Breaking: Major News Story"
         title2 = "major news story"
@@ -93,7 +93,7 @@ class TestDuplicationChecker:
         # Test length-based similarity
         assert self.checker._titles_are_similar(title1, title3) is True
 
-    def test_store_and_check_local_database(self):
+    def test_store_and_check_local_database(self) -> None:
         """Test storing and checking items in local database."""
         news_item = NewsItem(
             headline="Test News Story",
@@ -112,10 +112,11 @@ class TestDuplicationChecker:
         # Now should be detected as duplicate
         is_dup, reason = self.checker._check_local_database(news_item)
         assert is_dup
+        assert reason is not None
         assert "URL already submitted" in reason
         assert "test123" in reason
 
-    def test_check_duplicates_disabled(self):
+    def test_check_duplicates_disabled(self) -> None:
         """Test that duplicate checking can be disabled."""
         self.mock_config.check_for_duplicates = False
 
@@ -130,7 +131,7 @@ class TestDuplicationChecker:
         assert not is_dup
         assert reason is None
 
-    def test_cleanup_old_records(self):
+    def test_cleanup_old_records(self) -> None:
         """Test cleaning up old database records."""
         # Store some test items
         news_item = NewsItem(
@@ -146,7 +147,7 @@ class TestDuplicationChecker:
         deleted_count = self.checker.cleanup_old_records(days_to_keep=0)
         assert deleted_count >= 0
 
-    def test_get_statistics(self):
+    def test_get_statistics(self) -> None:
         """Test getting database statistics."""
         # Store some test items
         news_item = NewsItem(

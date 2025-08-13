@@ -4,9 +4,9 @@ import sys
 import time
 from typing import Any, List, Optional
 
-import praw
-from praw.exceptions import RedditAPIException, PRAWException
-from praw.models import Submission
+import praw  # type: ignore
+from praw.exceptions import RedditAPIException, PRAWException  # type: ignore
+from praw.models import Submission  # type: ignore
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsItem

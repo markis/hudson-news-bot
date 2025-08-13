@@ -8,7 +8,7 @@ from hudson_news_bot.news.models import NewsItem, NewsCollection
 class TestNewsItem:
     """Test NewsItem dataclass."""
 
-    def test_news_item_creation(self):
+    def test_news_item_creation(self) -> None:
         """Test creating a NewsItem."""
         item = NewsItem(
             headline="Test Headline",
@@ -22,7 +22,7 @@ class TestNewsItem:
         assert item.publication_date == datetime(2025, 8, 12)
         assert item.link == "https://example.com/news"
 
-    def test_to_toml_dict(self):
+    def test_to_toml_dict(self) -> None:
         """Test TOML dictionary conversion."""
         item = NewsItem(
             headline="Test Headline",
@@ -42,7 +42,7 @@ class TestNewsItem:
 class TestNewsCollection:
     """Test NewsCollection dataclass."""
 
-    def test_empty_collection(self):
+    def test_empty_collection(self) -> None:
         """Test empty news collection."""
         collection = NewsCollection(news=[])
 
@@ -50,7 +50,7 @@ class TestNewsCollection:
         assert list(collection) == []
         assert collection.get_urls() == set()
 
-    def test_collection_with_items(self):
+    def test_collection_with_items(self) -> None:
         """Test collection with news items."""
         items = [
             NewsItem(
@@ -76,7 +76,7 @@ class TestNewsCollection:
             "https://example.com/2",
         }
 
-    def test_add_item(self):
+    def test_add_item(self) -> None:
         """Test adding items to collection."""
         collection = NewsCollection(news=[])
         item = NewsItem("Test", "Summary", datetime(2025, 8, 12), "https://example.com")
@@ -86,7 +86,7 @@ class TestNewsCollection:
         assert len(collection) == 1
         assert list(collection)[0] == item
 
-    def test_to_toml_string(self):
+    def test_to_toml_string(self) -> None:
         """Test TOML string conversion."""
         items = [
             NewsItem(

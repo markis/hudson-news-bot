@@ -9,6 +9,7 @@ description = "News aggregation bot with Reddit integration using Claude SDK"
 requires-python = ">=3.12"
 dependencies = [
     "claude-code-sdk",
+    "mypy>=1.17.1",
     "praw",
     "pytest-cov>=6.2.1",
     "tomli-w",
@@ -47,5 +48,6 @@ addopts = [
 
 [dependency-groups]
 dev = [
+    "mypy>=1.17.1",
     "pyright>=1.1.403",
 ]

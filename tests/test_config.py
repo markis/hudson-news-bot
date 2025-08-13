@@ -11,7 +11,7 @@ from hudson_news_bot.config.settings import Config
 class TestConfig:
     """Test configuration management."""
 
-    def test_config_with_valid_file(self):
+    def test_config_with_valid_file(self) -> None:
         """Test loading valid configuration file."""
         config_content = """
 [news]
@@ -53,7 +53,7 @@ path = "test.db"
             finally:
                 Path(f.name).unlink()
 
-    def test_config_defaults_when_missing_values(self):
+    def test_config_defaults_when_missing_values(self) -> None:
         """Test default values when configuration values are missing."""
         config_content = """
 [news]
@@ -90,7 +90,7 @@ system_prompt = "Test prompt"
             "ANTHROPIC_API_KEY": "test_api_key",
         },
     )
-    def test_environment_variables(self):
+    def test_environment_variables(self) -> None:
         """Test reading environment variables."""
         config_content = """
 [news]
@@ -113,7 +113,7 @@ system_prompt = "Test prompt"
                 Path(f.name).unlink()
 
     @patch.dict(os.environ, {}, clear=True)
-    def test_validation_missing_credentials(self):
+    def test_validation_missing_credentials(self) -> None:
         """Test validation with missing credentials."""
         config_content = """
 [news]
@@ -144,7 +144,7 @@ system_prompt = "Test prompt"
             "ANTHROPIC_API_KEY": "test_api_key",
         },
     )
-    def test_validation_success(self):
+    def test_validation_success(self) -> None:
         """Test successful validation."""
         config_content = """
 [news]
@@ -165,7 +165,7 @@ system_prompt = "Test prompt"
             finally:
                 Path(f.name).unlink()
 
-    def test_validation_invalid_values(self):
+    def test_validation_invalid_values(self) -> None:
         """Test validation with invalid configuration values."""
         config_content = """
 [news]
