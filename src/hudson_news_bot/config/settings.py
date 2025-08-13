@@ -30,12 +30,10 @@ class Config:
 
     config_path: Path
     _data: Final[dict[str, Any]]
-    _max_articles: Final[int]
 
     def __init__(
         self,
         config_path: str | Path | None = None,
-        max_articles: int | None = None,
     ) -> None:
         """Initialize configuration.
 
@@ -55,10 +53,6 @@ class Config:
             # Create default config if it doesn't exist
             self._create_default_config()
             self._data = TOMLHandler.load_config(self.config_path)
-
-        if max_articles is None:
-            max_articles = int(self._data.get("news", {}).get("max_articles", 5))
-        self._max_articles = max_articles
 
     def _create_default_config(self) -> None:
         """Create a default configuration file."""
@@ -97,7 +91,7 @@ class Config:
     @property
     def max_articles(self) -> int:
         """Get maximum number of articles to aggregate."""
-        return self._max_articles
+        return int(self._data.get("news", {}).get("max_articles", 5))
 
     @property
     def system_prompt(self) -> str:

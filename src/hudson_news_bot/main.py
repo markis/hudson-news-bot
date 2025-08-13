@@ -163,9 +163,6 @@ async def main() -> None:
     )
     parser.add_argument("--output", type=str, help="Save aggregated news to TOML file")
     parser.add_argument(
-        "--max-articles", type=int, help="Override max articles from config"
-    )
-    parser.add_argument(
         "--log-level",
         type=str,
         default="INFO",
@@ -188,11 +185,8 @@ async def main() -> None:
     logger = get_logger("main")
 
     try:
-        max_articles = str(args.max_articles)
-        int_max_articles = int(max_articles) if max_articles.isnumeric() else None
-
         # Load configuration
-        config = Config(args.config, int_max_articles)
+        config = Config(args.config)
 
         # Initialize bot
         bot = NewsBot(config)

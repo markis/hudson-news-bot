@@ -38,6 +38,7 @@ src = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 addopts = [
     "--cov=hudson_news_bot",
     "--cov-report=term-missing",
