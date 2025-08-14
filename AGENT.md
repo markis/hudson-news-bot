@@ -8,40 +8,51 @@ Hudson News Bot is a Python news aggregation bot that integrates with Reddit usi
 
 ## Essential Commands
 
+Use the included Makefile for streamlined development. Run `make help` to see all available commands.
+
+### Quick Start
+```bash
+# Setup development environment
+make install-dev
+
+# Run all code quality checks
+make quality
+
+# Run tests with coverage
+make test-cov
+
+# Complete pre-commit workflow
+make pre-commit
+```
+
 ### Development Setup
 ```bash
-# Install dependencies with development tools
-uv sync --group dev
-
-# Install production dependencies only
-uv sync
+make install-dev    # Install dependencies with development tools
+make install        # Install production dependencies only
 ```
 
 ### Running the Application
 ```bash
-# Basic run
-uv run python -m hudson_news_bot.main
-
-# Common development options
-uv run python -m hudson_news_bot.main --dry-run --log-level DEBUG
-uv run python -m hudson_news_bot.main --test-connections
-uv run python -m hudson_news_bot.main --stats
+make run            # Basic run
+make run-dry        # Dry-run with debug logging
+make test-connections # Test API connections
+make stats          # Show bot statistics
 ```
 
 ### Code Quality (Required Before Commits)
 ```bash
-# Type checking (strict mode enabled)
-uv run mypy src/
+make quality        # Run all checks: lint, typecheck, security
+make lint           # Ruff linting only
+make format         # Format code with ruff
+make typecheck      # MyPy type checking
+make security       # Bandit security analysis
+```
 
-# Linting and formatting
-uv run ruff check
-uv run ruff format
-
-# Security analysis
-uv run bandit -r src/
-
-# Testing with coverage
-uv run pytest --cov=hudson_news_bot --cov-report=term-missing
+### Testing
+```bash
+make test           # Run tests
+make test-cov       # Run tests with coverage report
+make test-html      # Generate HTML coverage report
 ```
 
 ## Architecture

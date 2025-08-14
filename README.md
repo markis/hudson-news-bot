@@ -28,7 +28,7 @@ A Python news aggregation bot that integrates with Reddit using the Claude SDK. 
 
 2. **Install dependencies**:
    ```bash
-   uv sync --group dev
+   make install-dev
    ```
 
 3. **Set up environment variables**:
@@ -51,46 +51,76 @@ A Python news aggregation bot that integrates with Reddit using the Claude SDK. 
 
 ## Usage
 
+### Quick Start with Make
+
+The project includes a Makefile for streamlined development. Run `make help` to see all available commands.
+
+```bash
+# Setup and run basic development cycle
+make install-dev
+make run-dry
+make quality
+make test-cov
+```
+
 ### Basic Usage
 
 ```bash
 # Run the bot
-uv run python -m hudson_news_bot.main
+make run
 
 # Run in dry-run mode (no actual posting)
-uv run python -m hudson_news_bot.main --dry-run
+make run-dry
 
 # Use custom configuration
-uv run python -m hudson_news_bot.main --config custom_config.toml
+make run-custom-config CONFIG=custom_config.toml
 
 # Limit number of articles
-uv run python -m hudson_news_bot.main --max-articles 3
+make run-limited
 ```
 
 ### Testing and Diagnostics
 
 ```bash
 # Test all connections
-uv run python -m hudson_news_bot.main --test-connections
+make test-connections
 
 # Show bot statistics
-uv run python -m hudson_news_bot.main --stats
-
-# Enable debug logging
-uv run python -m hudson_news_bot.main --log-level DEBUG
+make stats
 
 # Save output to file
-uv run python -m hudson_news_bot.main --output results.toml
+make run-save-output OUTPUT=results.toml
 ```
 
 ### Development Commands
 
 ```bash
-# Run tests
-uv run pytest
+# Run all code quality checks
+make quality
 
 # Run tests with coverage
-uv run pytest --cov=hudson_news_bot --cov-report=html
+make test-cov
+
+# Generate HTML coverage report
+make test-html
+
+# Quick development cycle
+make dev
+
+# Pre-commit checks
+make pre-commit
+```
+
+### Traditional Commands
+
+If you prefer using uv directly:
+
+```bash
+# Run the bot
+uv run python -m hudson_news_bot.main
+
+# Run tests
+uv run pytest
 
 # Type checking
 uv run mypy src/
@@ -98,9 +128,6 @@ uv run mypy src/
 # Linting and formatting
 uv run ruff check
 uv run ruff format
-
-# Security analysis
-uv run bandit -r src/
 ```
 
 ## Configuration
@@ -181,12 +208,13 @@ src/hudson_news_bot/
 
 ```bash
 # Install with development dependencies
-uv sync --group dev
+make install-dev
 
 # Run pre-commit checks
-uv run ruff check
-uv run mypy src/
-uv run pytest
+make pre-commit
+
+# Quick development cycle
+make dev
 ```
 
 ### Code Quality Standards
@@ -200,15 +228,18 @@ uv run pytest
 
 ```bash
 # Run all tests
-uv run pytest
+make test
 
 # Run with coverage report
-uv run pytest --cov=hudson_news_bot --cov-report=term-missing --cov-report=html
+make test-cov
 
-# Run specific test file
+# Generate HTML coverage report
+make test-html
+
+# Run specific test file (traditional command)
 uv run pytest tests/test_deduplicator.py
 
-# Run with verbose output
+# Run with verbose output (traditional command)
 uv run pytest -v
 ```
 
@@ -240,10 +271,14 @@ uv run python -m hudson_news_bot.main --log-level DEBUG --log-file debug.log
 Ensure all code quality checks pass:
 
 ```bash
-uv run mypy src/
-uv run ruff check
-uv run pytest --cov=hudson_news_bot
-uv run bandit -r src/
+make pre-commit
+```
+
+Or run individual checks:
+
+```bash
+make quality
+make test-cov
 ```
 
 ## License
