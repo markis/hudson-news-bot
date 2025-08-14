@@ -7,24 +7,18 @@ name = "hudson-news-bot"
 version = "0.1.0"
 description = "News aggregation bot with Reddit integration using Claude SDK"
 requires-python = ">=3.12"
-dependencies = [
-    "claude-code-sdk",
-    "mypy>=1.17.1",
-    "asyncpraw",
-    "pytest-cov>=6.2.1",
-    "tomli-w",
-    "bandit>=1.8.6",
-]
+dependencies = ["asyncpraw>=7.8.1", "claude-code-sdk>=0.0.20", "tomli-w>=1.2.0"]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
-    "pytest",
-    "pytest-cov",
-    "pytest-asyncio",
-    "mypy",
-    "ruff",
-    "bandit",
-    "pyright"
+  "bandit>=1.8.6",
+  "mypy>=1.17.1",
+  "pyright>=1.1.403",
+  "pytest>=8.4.1",
+  "pytest-asyncio>=1.1.0",
+  "pytest-cov>=6.2.1",
+  "ruff>=0.12.8",
+  "tomli-w>=1.2.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -42,14 +36,7 @@ src = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = [
-    "--cov=hudson_news_bot",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-]
-
-[dependency-groups]
-dev = [
-    "mypy>=1.17.1",
-    "pyright>=1.1.403",
-    "pytest-asyncio>=1.1.0",
+  "--cov=hudson_news_bot",
+  "--cov-report=term-missing",
+  "--cov-report=html",
 ]

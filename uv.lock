@@ -365,14 +365,11 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "asyncpraw" },
-    { name = "bandit" },
     { name = "claude-code-sdk" },
-    { name = "mypy" },
-    { name = "pytest-cov" },
     { name = "tomli-w" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "bandit" },
     { name = "mypy" },
@@ -381,38 +378,26 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "mypy" },
-    { name = "pyright" },
-    { name = "pytest-asyncio" },
+    { name = "tomli-w" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "asyncpraw" },
-    { name = "bandit", specifier = ">=1.8.6" },
-    { name = "bandit", marker = "extra == 'dev'" },
-    { name = "claude-code-sdk" },
-    { name = "mypy", specifier = ">=1.17.1" },
-    { name = "mypy", marker = "extra == 'dev'" },
-    { name = "pyright", marker = "extra == 'dev'" },
-    { name = "pytest", marker = "extra == 'dev'" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'" },
-    { name = "pytest-cov", specifier = ">=6.2.1" },
-    { name = "pytest-cov", marker = "extra == 'dev'" },
-    { name = "ruff", marker = "extra == 'dev'" },
-    { name = "tomli-w" },
+    { name = "asyncpraw", specifier = ">=7.8.1" },
+    { name = "claude-code-sdk", specifier = ">=0.0.20" },
+    { name = "tomli-w", specifier = ">=1.2.0" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "bandit", specifier = ">=1.8.6" },
     { name = "mypy", specifier = ">=1.17.1" },
     { name = "pyright", specifier = ">=1.1.403" },
+    { name = "pytest", specifier = ">=8.4.1" },
     { name = "pytest-asyncio", specifier = ">=1.1.0" },
+    { name = "pytest-cov", specifier = ">=6.2.1" },
+    { name = "ruff", specifier = ">=0.12.8" },
+    { name = "tomli-w", specifier = ">=1.2.0" },
 ]
 
 [[package]]
