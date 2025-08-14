@@ -398,7 +398,7 @@ class DuplicationChecker:
                     news_item.headline,
                     title_hash,
                     submission_id,
-                    datetime.now(),
+                    datetime.now().isoformat(),
                     source,
                 ),
             )
@@ -416,7 +416,7 @@ class DuplicationChecker:
         Returns:
             Number of records deleted
         """
-        cutoff_date = datetime.now() - timedelta(days=days_to_keep)
+        cutoff_date = (datetime.now() - timedelta(days=days_to_keep)).isoformat()
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -451,7 +451,7 @@ class DuplicationChecker:
             by_source = dict(cursor.fetchall())
 
             # Recent records (last 7 days)
-            week_ago = datetime.now() - timedelta(days=7)
+            week_ago = (datetime.now() - timedelta(days=7)).isoformat()
             cursor.execute(
                 "SELECT COUNT(*) FROM submitted_urls WHERE submitted_at > ?",
                 (week_ago,),

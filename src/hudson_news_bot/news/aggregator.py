@@ -89,7 +89,7 @@ class NewsAggregator:
         )
 
         async with ClaudeSDKClient(options=self.options) as client:
-            prompt = self._create_aggregation_prompt()
+            prompt = self.create_aggregation_prompt()
             self.logger.debug(f"Sending prompt to Claude: {prompt}")
 
             # Send query and collect response
@@ -113,7 +113,7 @@ class NewsAggregator:
 
         raise Exception("No response received from Claude")
 
-    def _create_aggregation_prompt(self) -> str:
+    def create_aggregation_prompt(self) -> str:
         """Create the prompt for news aggregation.
 
         Returns:
@@ -149,7 +149,7 @@ class NewsAggregator:
 
         try:
             # Extract TOML content from response
-            toml_content = self._extract_toml_from_response(response)
+            toml_content = self.extract_toml_from_response(response)
 
             if not toml_content:
                 raise ValueError("No valid TOML content found in response")
@@ -169,7 +169,7 @@ class NewsAggregator:
             self.logger.debug(f"Raw response: {response}")
             raise ValueError(f"Failed to parse Claude response: {e}")
 
-    def _extract_toml_from_response(self, response: str) -> Optional[str]:
+    def extract_toml_from_response(self, response: str) -> Optional[str]:
         """Extract TOML content from Claude's response.
 
         Args:
