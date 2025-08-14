@@ -76,26 +76,26 @@ class TestMainCLI:
     """Test the main CLI function."""
 
     @patch("sys.argv", ["aggregator.py", "--test-connection"])
-    @patch("hudson_news_bot.news.aggregator.asyncio.run")
+    @patch("hudson_news_bot.news.aggregator.test_connection")
     @patch("sys.exit")
     def test_main_test_connection_success(
-        self, mock_exit: MagicMock, mock_asyncio_run: MagicMock
+        self, mock_exit: MagicMock, mock_test_connection: AsyncMock
     ) -> None:
         """Test main CLI with successful connection test."""
-        mock_asyncio_run.return_value = True
+        mock_test_connection.return_value = True
 
         main()
 
         mock_exit.assert_called_once_with(0)
 
     @patch("sys.argv", ["aggregator.py", "--test-connection"])
-    @patch("hudson_news_bot.news.aggregator.asyncio.run")
+    @patch("hudson_news_bot.news.aggregator.test_connection")
     @patch("sys.exit")
     def test_main_test_connection_failure(
-        self, mock_exit: MagicMock, mock_asyncio_run: MagicMock
+        self, mock_exit: MagicMock, mock_test_connection: AsyncMock
     ) -> None:
         """Test main CLI with failed connection test."""
-        mock_asyncio_run.return_value = False
+        mock_test_connection.return_value = False
 
         main()
 
