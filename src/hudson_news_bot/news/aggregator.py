@@ -1,11 +1,17 @@
 """News aggregation using Claude Code SDK."""
 
 import asyncio
+import datetime
 import re
 import sys
 from typing import Optional
 
-from claude_code_sdk import ClaudeCodeOptions, ClaudeSDKClient
+from claude_code_sdk import (
+    AssistantMessage,
+    ClaudeCodeOptions,
+    ClaudeSDKClient,
+    TextBlock,
+)
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsCollection
@@ -26,10 +32,42 @@ class NewsAggregator:
         self.logger = get_logger("news.aggregator")
 
         # Configure Claude SDK options
+        # Use bypassPermissions to allow web access for fetching real news
         self.options = ClaudeCodeOptions(
             system_prompt=config.system_prompt,
             max_turns=config.claude_max_turns,
-            permission_mode="default",  # Use valid literal value
+            permission_mode="default",
+            disallowed_tools=["WebFetch", "WebSearch"],
+            allowed_tools=[
+                "Task",
+                "Read",
+                "ListMcpResourcesTool",
+                "ReadMcpResourceTool",
+                "mcp__playwright__browser_close",
+                "mcp__playwright__browser_resize",
+                "mcp__playwright__browser_console_messages",
+                "mcp__playwright__browser_handle_dialog",
+                "mcp__playwright__browser_evaluate",
+                "mcp__playwright__browser_file_upload",
+                "mcp__playwright__browser_install",
+                "mcp__playwright__browser_press_key",
+                "mcp__playwright__browser_type",
+                "mcp__playwright__browser_navigate",
+                "mcp__playwright__browser_navigate_back",
+                "mcp__playwright__browser_navigate_forward",
+                "mcp__playwright__browser_network_requests",
+                "mcp__playwright__browser_take_screenshot",
+                "mcp__playwright__browser_snapshot",
+                "mcp__playwright__browser_click",
+                "mcp__playwright__browser_drag",
+                "mcp__playwright__browser_hover",
+                "mcp__playwright__browser_select_option",
+                "mcp__playwright__browser_tab_list",
+                "mcp__playwright__browser_tab_new",
+                "mcp__playwright__browser_tab_select",
+                "mcp__playwright__browser_tab_close",
+                "mcp__playwright__browser_wait_for",
+            ],
         )
 
     async def aggregate_news(self) -> NewsCollection:
@@ -46,20 +84,27 @@ class NewsAggregator:
         )
 
         async with ClaudeSDKClient(options=self.options) as client:
-            response_content = ""
             prompt = self._create_aggregation_prompt()
             self.logger.debug(f"Sending prompt to Claude: {prompt}")
 
-            # Start the conversation
+            # Send query and collect response
             await client.query(prompt)
-            async for message in client.receive_response():
-                if content := getattr(message, "content", None):
-                    response_content = content
-                    break
 
-            # Parse the response
-            if response_content:
-                return self._parse_response(response_content)
+            # Build response from text blocks
+            response_chunks: list[str] = []
+            async for message in client.receive_response():
+                self.logger.debug(f"Received message: {message}")
+                if isinstance(message, AssistantMessage):
+                    response_chunks.extend(
+                        content.text
+                        for content in message.content
+                        if isinstance(content, TextBlock)
+                    )
+
+            # Parse and return results if response received
+            if response_chunks:
+                content = " ".join(response_chunks)
+                return self._parse_response(content)
 
         raise Exception("No response received from Claude")
 
@@ -69,11 +114,16 @@ class NewsAggregator:
         Returns:
             Formatted prompt string
         """
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
         return (
-            f"Find {self.config.max_articles} current trending news stories from reliable sources. "
-            "For each story, extract the headline, summary, publication date, and link. "
-            "Format your response as valid TOML using the exact structure specified in the system prompt. "
-            "Only include real, verifiable news from the last 24 hours."
+            f"Today is {today} and I need you to find up to {self.config.max_articles} articles from these websites."
+            """
+            - https://hudsonohiotoday.com/
+            - https://thesummiteer.org/posts
+            - https://www.beaconjournal.com/communities/hudsonhubtimes/
+            - https://www.news5cleveland.com/news/local-news/oh-summit/
+            - https://www.wkyc.com/section/summit-county
+            """
         )
 
     def _parse_response(self, response: str) -> NewsCollection:
@@ -155,7 +205,14 @@ async def test_connection() -> bool:
             # Simple test query
             await client.query("Please respond with just 'OK' to confirm connection.")
             async for message in client.receive_response():
-                if (content := getattr(message, "content", None)) and "OK" in content:
+                text = ""
+                if type(message) is AssistantMessage:
+                    for content in message.content:
+                        if type(content) is TextBlock:
+                            text += content.text
+
+                if "OK" in text:
+                    logger.info(f"Claude response: {text}")
                     logger.info("✅ Claude SDK connection successful")
                     return True
 

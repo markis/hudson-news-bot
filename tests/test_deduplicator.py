@@ -116,7 +116,7 @@ class TestDuplicationChecker:
         assert "URL already submitted" in reason
         assert "test123" in reason
 
-    def test_check_duplicates_disabled(self) -> None:
+    async def test_check_duplicates_disabled(self) -> None:
         """Test that duplicate checking can be disabled."""
         self.mock_config.check_for_duplicates = False
 
@@ -127,7 +127,7 @@ class TestDuplicationChecker:
             link="https://example.com/news",
         )
 
-        is_dup, reason = self.checker.is_duplicate(news_item)
+        is_dup, reason = await self.checker.is_duplicate(news_item)
         assert not is_dup
         assert reason is None
 

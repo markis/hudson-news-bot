@@ -1,12 +1,12 @@
-"""Reddit API client using PRAW."""
+"""Reddit API client using Async PRAW."""
 
+import asyncio
 import sys
-import time
-from typing import Any, List, Optional
+from typing import Any
 
-import praw  # type: ignore
-from praw.exceptions import RedditAPIException, PRAWException  # type: ignore
-from praw.models import Submission  # type: ignore
+import asyncpraw  # type: ignore
+from asyncpraw.exceptions import AsyncPRAWException, RedditAPIException  # type: ignore
+from asyncpraw.models import Submission  # type: ignore
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsItem
@@ -24,10 +24,10 @@ class RedditClient:
         """
         self.config = config
         self.logger = get_logger("reddit.client")
-        self._reddit: Optional[praw.Reddit] = None
+        self._reddit: asyncpraw.Reddit | None = None
         self._subreddit = None
 
-    def _get_reddit_instance(self) -> praw.Reddit:
+    async def _get_reddit_instance(self) -> asyncpraw.Reddit:
         """Get or create Reddit instance.
 
         Returns:
@@ -48,7 +48,7 @@ class RedditClient:
 
             self.logger.info("Initializing Reddit client")
 
-            self._reddit = praw.Reddit(
+            self._reddit = asyncpraw.Reddit(
                 client_id=self.config.reddit_client_id,
                 client_secret=self.config.reddit_client_secret,
                 user_agent=self.config.reddit_user_agent,
@@ -59,7 +59,7 @@ class RedditClient:
             # Test authentication
             try:
                 # This will fail if authentication is not working
-                user = self._reddit.user.me()
+                user = await self._reddit.user.me()
                 if user:
                     self.logger.info(f"Authenticated as Reddit user: {user.name}")
                 else:
@@ -71,18 +71,23 @@ class RedditClient:
 
         return self._reddit
 
-    def _get_subreddit(self) -> Any:
+    async def close(self) -> None:
+        """Close the Reddit client session."""
+        if self._reddit:
+            await self._reddit.close()
+
+    async def _get_subreddit(self) -> Any:
         """Get subreddit instance."""
         if self._subreddit is None:
-            reddit = self._get_reddit_instance()
+            reddit = await self._get_reddit_instance()
             self._subreddit = reddit.subreddit(self.config.subreddit_name)
             self.logger.info(f"Connected to subreddit: r/{self.config.subreddit_name}")
 
         return self._subreddit
 
-    def submit_news_item(
+    async def submit_news_item(
         self, news_item: NewsItem, dry_run: bool = False
-    ) -> Optional[Submission]:
+    ) -> Submission | None:
         """Submit a news item to Reddit.
 
         Args:
@@ -92,8 +97,6 @@ class RedditClient:
         Returns:
             Submission object if successful, None otherwise
         """
-        subreddit = self._get_subreddit()
-
         title = news_item.headline
         if len(title) > 300:  # Reddit title limit
             title = title[:297] + "..."
@@ -106,8 +109,10 @@ class RedditClient:
             self.logger.info(f"URL: {news_item.link}")
             return None
 
+        subreddit = await self._get_subreddit()
+
         try:
-            submission = subreddit.submit(title=title, url=news_item.link)
+            submission = await subreddit.submit(title=title, url=news_item.link)
 
             self.logger.info(f"Successfully submitted: {submission.url}")
             return submission
@@ -119,7 +124,7 @@ class RedditClient:
                 )
             return None
 
-        except PRAWException as e:
+        except AsyncPRAWException as e:
             self.logger.error(f"Reddit error: {e}")
             return None
 
@@ -127,9 +132,9 @@ class RedditClient:
             self.logger.error(f"Unexpected error submitting to Reddit: {e}")
             return None
 
-    def submit_multiple_news_items(
+    async def submit_multiple_news_items(
         self,
-        news_items: List[NewsItem],
+        news_items: list[NewsItem],
         dry_run: bool = False,
         delay_between_posts: int = 60,
     ) -> list[Submission | None]:
@@ -150,9 +155,9 @@ class RedditClient:
                 self.logger.info(
                     f"Waiting {delay_between_posts} seconds before next submission..."
                 )
-                time.sleep(delay_between_posts)
+                await asyncio.sleep(delay_between_posts)
 
-            submission = self.submit_news_item(news_item, dry_run=dry_run)
+            submission = await self.submit_news_item(news_item, dry_run=dry_run)
             submissions.append(submission)
 
         success_count = sum(1 for s in submissions if s is not None)
@@ -163,7 +168,9 @@ class RedditClient:
 
         return submissions
 
-    def search_submissions(self, query: str, limit: int = 100) -> List[Submission]:
+    async def search_submissions(
+        self, query: str, limit: int = 100
+    ) -> list[Submission]:
         """Search for submissions in the subreddit.
 
         Args:
@@ -173,10 +180,13 @@ class RedditClient:
         Returns:
             List of matching submissions
         """
-        subreddit = self._get_subreddit()
+        subreddit = await self._get_subreddit()
 
         try:
-            submissions = list(subreddit.search(query, limit=limit, sort="new"))
+            submissions = [
+                submission
+                async for submission in subreddit.search(query, limit=limit, sort="new")
+            ]
             self.logger.debug(
                 f"Found {len(submissions)} submissions for query: {query}"
             )
@@ -186,7 +196,7 @@ class RedditClient:
             self.logger.error(f"Error searching Reddit: {e}")
             return []
 
-    def get_recent_submissions(self, limit: int = 100) -> List[Submission]:
+    async def get_recent_submissions(self, limit: int = 100) -> list[Submission]:
         """Get recent submissions from the subreddit.
 
         Args:
@@ -195,10 +205,12 @@ class RedditClient:
         Returns:
             List of recent submissions
         """
-        subreddit = self._get_subreddit()
+        subreddit = await self._get_subreddit()
 
         try:
-            submissions = list(subreddit.new(limit=limit))
+            submissions = [
+                submission async for submission in subreddit.new(limit=limit)
+            ]
             self.logger.debug(f"Retrieved {len(submissions)} recent submissions")
             return submissions
 
@@ -206,15 +218,15 @@ class RedditClient:
             self.logger.error(f"Error getting recent submissions: {e}")
             return []
 
-    def test_connection(self) -> bool:
+    async def test_connection(self) -> bool:
         """Test Reddit API connection.
 
         Returns:
             True if connection successful, False otherwise
         """
         try:
-            reddit = self._get_reddit_instance()
-            subreddit = self._get_subreddit()
+            reddit = await self._get_reddit_instance()
+            subreddit = await self._get_subreddit()
 
             # Test basic subreddit access
             subreddit_info = subreddit.display_name
@@ -222,7 +234,7 @@ class RedditClient:
 
             # Test user authentication if available
             try:
-                user = reddit.user.me()
+                user = await reddit.user.me()
                 if user:
                     self.logger.info(f"✅ Authenticated as user: {user.name}")
             except Exception:
@@ -252,7 +264,7 @@ def main() -> None:
     if args.test_connection:
         config = Config(args.config)
         client = RedditClient(config)
-        success = client.test_connection()
+        success = asyncio.run(client.test_connection())
         sys.exit(0 if success else 1)
     else:
         parser.print_help()

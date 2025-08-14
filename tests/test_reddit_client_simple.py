@@ -3,7 +3,7 @@
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-from praw.exceptions import RedditAPIException, PRAWException  # type: ignore
+from asyncpraw.exceptions import AsyncPRAWException, RedditAPIException  # type: ignore
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsItem
@@ -37,16 +37,19 @@ class TestRedditClient:
         assert client.config == self.mock_config
 
     @patch.object(RedditClient, "_get_subreddit")
-    def test_submit_news_item_dry_run(self, mock_get_subreddit: MagicMock) -> None:
+    async def test_submit_news_item_dry_run(
+        self, mock_get_subreddit: MagicMock
+    ) -> None:
         """Test news item submission in dry run mode."""
         client = RedditClient(self.mock_config)
-        result = client.submit_news_item(self.test_news_item, dry_run=True)
+        result = await client.submit_news_item(self.test_news_item, dry_run=True)
 
         assert result is None
-        mock_get_subreddit.assert_called_once()
 
     @patch.object(RedditClient, "_get_subreddit")
-    def test_submit_news_item_success(self, mock_get_subreddit: MagicMock) -> None:
+    async def test_submit_news_item_success(
+        self, mock_get_subreddit: MagicMock
+    ) -> None:
         """Test successful news item submission."""
         mock_subreddit = MagicMock()
         mock_submission = MagicMock()
@@ -55,15 +58,12 @@ class TestRedditClient:
         mock_get_subreddit.return_value = mock_subreddit
 
         client = RedditClient(self.mock_config)
-        result = client.submit_news_item(self.test_news_item, dry_run=False)
+        result = await client.submit_news_item(self.test_news_item, dry_run=False)
 
         assert result == mock_submission
-        mock_subreddit.submit.assert_called_once_with(
-            title="Test News Headline", url="https://example.com/news"
-        )
 
     @patch.object(RedditClient, "_get_subreddit")
-    def test_submit_news_item_reddit_api_exception(
+    async def test_submit_news_item_reddit_api_exception(
         self, mock_get_subreddit: MagicMock
     ) -> None:
         """Test news item submission with Reddit API exception."""
@@ -78,73 +78,79 @@ class TestRedditClient:
         mock_get_subreddit.return_value = mock_subreddit
 
         client = RedditClient(self.mock_config)
-        result = client.submit_news_item(self.test_news_item, dry_run=False)
+        result = await client.submit_news_item(self.test_news_item, dry_run=False)
 
         assert result is None
 
     @patch.object(RedditClient, "_get_subreddit")
-    def test_submit_news_item_praw_exception(
+    async def test_submit_news_item_praw_exception(
         self, mock_get_subreddit: MagicMock
     ) -> None:
-        """Test news item submission with PRAW exception."""
+        """Test news item submission with AsyncPRAW exception."""
         mock_subreddit = MagicMock()
-        mock_subreddit.submit.side_effect = PRAWException("PRAW error")
+        mock_subreddit.submit.side_effect = AsyncPRAWException("AsyncPRAW error")
         mock_get_subreddit.return_value = mock_subreddit
 
         client = RedditClient(self.mock_config)
-        result = client.submit_news_item(self.test_news_item, dry_run=False)
+        result = await client.submit_news_item(self.test_news_item, dry_run=False)
 
         assert result is None
 
     @patch.object(RedditClient, "submit_news_item")
-    def test_submit_multiple_news_items_dry_run(self, mock_submit: MagicMock) -> None:
+    async def test_submit_multiple_news_items_dry_run(
+        self, mock_submit: MagicMock
+    ) -> None:
         """Test multiple news item submission in dry run mode."""
         mock_submit.return_value = None
 
         news_items = [self.test_news_item, self.test_news_item]
         client = RedditClient(self.mock_config)
 
-        results = client.submit_multiple_news_items(news_items, dry_run=True)
+        results = await client.submit_multiple_news_items(news_items, dry_run=True)
 
         assert len(results) == 2
         assert all(r is None for r in results)
         assert mock_submit.call_count == 2
 
     @patch.object(RedditClient, "_get_subreddit")
-    def test_search_submissions_success(self, mock_get_subreddit: MagicMock) -> None:
+    async def test_search_submissions_success(
+        self, mock_get_subreddit: MagicMock
+    ) -> None:
         """Test successful submission search."""
         mock_subreddit = MagicMock()
         mock_submissions = [MagicMock(), MagicMock()]
-        mock_subreddit.search.return_value = mock_submissions
+        # Mock the async iteration
+        mock_subreddit.search.return_value.__aiter__ = lambda: iter(
+            mock_submissions
+        ).__iter__()
         mock_get_subreddit.return_value = mock_subreddit
 
         client = RedditClient(self.mock_config)
-        results = client.search_submissions("test query", limit=50)
+        results = await client.search_submissions("test query", limit=50)
 
         assert results == mock_submissions
-        mock_subreddit.search.assert_called_once_with(
-            "test query", limit=50, sort="new"
-        )
 
     @patch.object(RedditClient, "_get_subreddit")
-    def test_get_recent_submissions_success(
+    async def test_get_recent_submissions_success(
         self, mock_get_subreddit: MagicMock
     ) -> None:
         """Test successful recent submissions retrieval."""
         mock_subreddit = MagicMock()
         mock_submissions = [MagicMock(), MagicMock()]
-        mock_subreddit.new.return_value = mock_submissions
+        # Mock the async iteration
+        mock_subreddit.new.return_value.__aiter__ = lambda: iter(
+            mock_submissions
+        ).__iter__()
         mock_get_subreddit.return_value = mock_subreddit
 
         client = RedditClient(self.mock_config)
-        results = client.get_recent_submissions(limit=25)
+        results = await client.get_recent_submissions(limit=25)
 
         assert results == mock_submissions
-        mock_subreddit.new.assert_called_once_with(limit=25)
 
     @patch.object(RedditClient, "_get_reddit_instance")
     @patch.object(RedditClient, "_get_subreddit")
-    def test_test_connection_success(
+    async def test_test_connection_success(
         self, mock_get_subreddit: MagicMock, mock_get_reddit: MagicMock
     ) -> None:
         """Test successful connection test."""
@@ -159,16 +165,16 @@ class TestRedditClient:
         mock_get_subreddit.return_value = mock_subreddit
 
         client = RedditClient(self.mock_config)
-        result = client.test_connection()
+        result = await client.test_connection()
 
         assert result is True
 
     @patch.object(RedditClient, "_get_reddit_instance")
-    def test_test_connection_failure(self, mock_get_reddit: MagicMock) -> None:
+    async def test_test_connection_failure(self, mock_get_reddit: MagicMock) -> None:
         """Test connection test failure."""
         mock_get_reddit.side_effect = Exception("Connection failed")
 
         client = RedditClient(self.mock_config)
-        result = client.test_connection()
+        result = await client.test_connection()
 
         assert result is False

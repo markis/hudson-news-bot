@@ -48,7 +48,25 @@ class NewsBot:
             # Step 1: Validate configuration
             self.logger.info("Validating configuration...")
             is_valid, errors = self.config.validate()
-            if not is_valid:
+
+            # For dry runs, filter out Reddit-related validation errors
+            if dry_run:
+                non_reddit_errors = [
+                    error
+                    for error in errors
+                    if not any(
+                        reddit_term in error
+                        for reddit_term in ["REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET"]
+                    )
+                ]
+                if non_reddit_errors:
+                    self.logger.error("Configuration validation failed:")
+                    for error in non_reddit_errors:
+                        self.logger.error(f"  - {error}")
+                    return False
+                elif errors:
+                    self.logger.info("Skipping Reddit validation for dry run")
+            elif not is_valid:
                 self.logger.error("Configuration validation failed:")
                 for error in errors:
                     self.logger.error(f"  - {error}")
@@ -72,8 +90,12 @@ class NewsBot:
                 TOMLHandler.write_news_toml(news_collection, output_file)
 
             # Step 4: Filter duplicates
-            self.logger.info("Checking for duplicates...")
-            unique_news_items = await self._filter_duplicates(news_collection)
+            if dry_run:
+                self.logger.info("Skipping duplicate check for dry run")
+                unique_news_items = list(news_collection)
+            else:
+                self.logger.info("Checking for duplicates...")
+                unique_news_items = await self._filter_duplicates(news_collection)
 
             if not unique_news_items:
                 self.logger.info("All news items were duplicates, nothing to post")
@@ -83,7 +105,7 @@ class NewsBot:
 
             # Step 5: Post to Reddit
             self.logger.info(f"{'[DRY RUN] ' if dry_run else ''}Posting to Reddit...")
-            submissions = self.reddit_client.submit_multiple_news_items(
+            submissions = await self.reddit_client.submit_multiple_news_items(
                 unique_news_items, dry_run=dry_run
             )
 
@@ -125,7 +147,7 @@ class NewsBot:
         unique_items: list[NewsItem] = []
 
         for news_item in news_collection:
-            is_duplicate, reason = self.deduplicator.is_duplicate(news_item)
+            is_duplicate, reason = await self.deduplicator.is_duplicate(news_item)
 
             if is_duplicate:
                 self.logger.info(f"Skipping duplicate: {news_item.headline} ({reason})")
@@ -205,7 +227,7 @@ async def main() -> None:
             logger.info("Testing connections...")
 
             # Test Reddit
-            reddit_ok = bot.reddit_client.test_connection()
+            reddit_ok = await bot.reddit_client.test_connection()
 
             # Test Claude SDK
             from hudson_news_bot.news.aggregator import test_connection

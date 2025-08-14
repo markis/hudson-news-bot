@@ -1,28 +1,90 @@
 """Configuration management for the news aggregation bot."""
 
+import copy
 import os
 import sys
+from functools import cached_property
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, cast
 
 from hudson_news_bot.utils.toml_handler import TOMLHandler
 
 DEFAULT_SYSTEM_PROMPT: Final = """
-You are a news aggregation bot. Discover 5 current trending news stories from reliable sources. For each story, extract:
-- headline (clear, concise)
-- summary (2-3 sentences max)
-- publication_date (YYYY-MM-DD format)
-- link (original source URL)
+You are a news aggregation bot focused exclusively on Hudson, Ohio. Your job is to find up to 5 real, verifiable local news stories published within the last 24 hours and output them as valid TOML in the exact structure specified below. You must strictly follow all constraints and output requirements.
 
-Format your response as valid TOML using this exact structure:
-[[news]]
-headline = "story headline"
-summary = "brief summary"
-publication_date = "2025-08-12"
-link = "https://source.com/article"
+Requirements
+- Scope: Only include current, trending news about Hudson, Ohio (city, government, schools, roads, events, businesses, public safety, infrastructure). Exclude non-Hudson items.
+- Time window: Last 24 hours only. Verify publication dates on-page.
+- Start with these sources:
+  - https://hudsonohiotoday.com/
+  - https://thesummiteer.org/posts
+  - https://www.beaconjournal.com/communities/hudsonhubtimes/
+  - https://www.news5cleveland.com/news/local-news/oh-summit/
+  - https://www.wkyc.com/section/summit-county
+- Fetching:
+  1) Use Playwright to fetch the fully rendered page and extract the visible content.
+- Verification:
+  - Ensure the final URL is directly accessible.
+  - Confirm the article is about Hudson, Ohio.
+  - Extract a clear headline, a concise 2–3 sentence summary, and the correct publication date in YYYY-MM-DD (convert from local timezone if needed).
+- Output:
+  - Valid TOML only, no extra commentary.
+  - Use exactly this structure for each story:
+    [[news]]
+    headline = "story headline"
+    summary = "brief summary"
+    publication_date = "2025-08-12"
+    link = "https://source.com/article"
+  - If no qualifying articles are found, output exactly:
+    [[news]]
+- Limits: Up to 5 stories. No duplicates. De-duplicate syndicated/reposted content by choosing the original or most authoritative version.
 
-Only include real, verifiable news from the last 24 hours. Ensure all URLs are accessible.
+Process
+1) Discover
+   - For each listed site, open the homepage or posts list and identify items within the last 24 hours. Prefer items with explicit timestamps and clear Hudson locality.
+2) Fetch
+   - Fetch each candidate article page with Playwright.
+3) Validate
+   - Confirm publication date is within the last 24 hours.
+   - Confirm explicit Hudson, Ohio relevance (title/body/section tags).
+   - Ensure the final URL is publicly accessible without login.
+4) Extract
+   - headline: from  or on-page headline (h1). Clean site name suffixes.
+   - summary: 2–3 sentences capturing the core facts (who/what/where/when). Avoid opinions and boilerplate.
+   - publication_date: normalize to YYYY-MM-DD from the page timestamp; if only time is shown, infer date from site timezone (local area).
+   - link: canonical article URL.
+5) Output
+   - Produce only valid TOML with one or more [[news]] tables as specified. No markdown fences, no extra text.
+
+Quality checks before output
+- All links load and are not 404/soft paywall blocked.
+- Dates are within last 24 hours and in YYYY-MM-DD format.
+- No more than 5 items.
+- No non-Hudson items.
+- TOML parses successfully.
+
+Failure mode
+- If no qualifying articles are found after checking all provided sites, output exactly:
+  [[news]]
 """
+DEFAULT_CONFIG: Final = {
+    "news": {
+        "max_articles": 5,
+        "system_prompt": DEFAULT_SYSTEM_PROMPT,
+    },
+    "reddit": {
+        "subreddit": "news",
+        "user_agent": "hudson-news-bot/0.1.0",
+        "check_for_duplicates": True,
+        "max_search_results": 100,
+    },
+    "claude": {
+        "max_turns": 3,
+        "permission_mode": "readOnly",
+        "timeout_seconds": 300,
+    },
+    "database": {"path": "data/submissions.db"},
+}
 
 
 class Config:
@@ -50,115 +112,82 @@ class Config:
 
     def _get_config_data(self, config_path: Path) -> dict[str, Any]:
         """Load configuration data from the specified TOML file."""
-        try:
-            return TOMLHandler.load_config(config_path)
-        except FileNotFoundError:
-            # Create default config if it doesn't exist
-            self._create_default_config()
-            return TOMLHandler.load_config(config_path)
+        data = TOMLHandler.load_config(config_path)
+        return deep_merge_dicts(DEFAULT_CONFIG, data)
 
-    def _create_default_config(self) -> None:
-        """Create a default configuration file."""
-        default_config = {
-            "news": {
-                "max_articles": 5,
-                "system_prompt": DEFAULT_SYSTEM_PROMPT,
-            },
-            "reddit": {
-                "subreddit": "news",
-                "user_agent": "hudson-news-bot/0.1.0",
-                "check_for_duplicates": True,
-                "max_search_results": 100,
-            },
-            "claude": {
-                "max_turns": 3,
-                "permission_mode": "readOnly",
-                "timeout_seconds": 300,
-            },
-            "database": {"path": "data/submissions.db"},
-        }
-
-        # Ensure config directory exists
-        self._config_path.parent.mkdir(parents=True, exist_ok=True)
-
-        import tomli_w
-
-        with open(self._config_path, "wb") as f:
-            tomli_w.dump(default_config, f)
-
-    @property
+    @cached_property
     def subreddit_name(self) -> str:
         """Get Reddit subreddit name."""
         return str(self._data.get("reddit", {}).get("subreddit", "news"))
 
-    @property
+    @cached_property
     def max_articles(self) -> int:
         """Get maximum number of articles to aggregate."""
         return int(self._data.get("news", {}).get("max_articles", 5))
 
-    @property
+    @cached_property
     def system_prompt(self) -> str:
         """Get Claude system prompt for news aggregation."""
         return str(self._data.get("news", {}).get("system_prompt", ""))
 
-    @property
+    @cached_property
     def reddit_user_agent(self) -> str:
         """Get Reddit API user agent."""
         return str(
             self._data.get("reddit", {}).get("user_agent", "hudson-news-bot/0.1.0")
         )
 
-    @property
+    @cached_property
     def check_for_duplicates(self) -> bool:
         """Whether to check for duplicate submissions."""
         return bool(self._data.get("reddit", {}).get("check_for_duplicates", True))
 
-    @property
+    @cached_property
     def max_search_results(self) -> int:
         """Maximum search results for duplicate checking."""
         return int(self._data.get("reddit", {}).get("max_search_results", 100))
 
-    @property
+    @cached_property
     def claude_max_turns(self) -> int:
         """Maximum turns for Claude conversation."""
         return int(self._data.get("claude", {}).get("max_turns", 3))
 
-    @property
+    @cached_property
     def claude_permission_mode(self) -> str:
         """Claude permission mode."""
         return str(self._data.get("claude", {}).get("permission_mode", "readOnly"))
 
-    @property
+    @cached_property
     def claude_timeout_seconds(self) -> int:
         """Claude request timeout in seconds."""
         return int(self._data.get("claude", {}).get("timeout_seconds", 300))
 
-    @property
+    @cached_property
     def database_path(self) -> str:
         """Database path for submission tracking."""
         return str(self._data.get("database", {}).get("path", "data/submissions.db"))
 
-    @property
+    @cached_property
     def anthropic_api_key(self) -> str | None:
         """Get Anthropic API key from environment."""
         return os.getenv("ANTHROPIC_API_KEY")
 
-    @property
+    @cached_property
     def reddit_client_id(self) -> str | None:
         """Get Reddit client ID from environment."""
         return os.getenv("REDDIT_CLIENT_ID")
 
-    @property
+    @cached_property
     def reddit_client_secret(self) -> str | None:
         """Get Reddit client secret from environment."""
         return os.getenv("REDDIT_CLIENT_SECRET")
 
-    @property
+    @cached_property
     def reddit_username(self) -> str | None:
         """Get Reddit username from environment."""
         return os.getenv("REDDIT_USERNAME")
 
-    @property
+    @cached_property
     def reddit_password(self) -> str | None:
         """Get Reddit password from environment."""
         return os.getenv("REDDIT_PASSWORD")
@@ -183,11 +212,11 @@ class Config:
             errors.append("REDDIT_CLIENT_SECRET environment variable is required")
 
         # Check Claude authentication
-        if not self.anthropic_api_key:
-            # Check if Claude CLI might be logged in (this is harder to verify)
-            errors.append(
-                "ANTHROPIC_API_KEY not found. Ensure 'claude login' is completed or set API key"
-            )
+        # if not self.anthropic_api_key:
+        #     # Check if Claude CLI might be logged in (this is harder to verify)
+        #     errors.append(
+        #         "ANTHROPIC_API_KEY not found. Ensure 'claude login' is completed or set API key"
+        #     )
 
         # Validate config values
         if self.max_articles <= 0:
@@ -197,6 +226,31 @@ class Config:
             errors.append("system_prompt cannot be empty")
 
         return len(errors) == 0, errors
+
+
+def deep_merge_dicts(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
+    """
+    Recursively combine two dictionaries where dict2 overrides values in dict1 for common keys.
+    For nested dictionaries, performs a deep merge rather than simple replacement.
+
+    Args:
+        dict1 (dict): The base dictionary
+        dict2 (dict): The dictionary with overriding values
+
+    Returns:
+        dict: A new dictionary with the deeply combined key-value pairs
+    """
+
+    result = copy.deepcopy(dict1)  # Create a deep copy to avoid modifying the original
+
+    for key, value in dict2.items():
+        # If both values are dictionaries, recursively merge them
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = deep_merge_dicts(result[key], cast(dict[str, Any], value))
+        else:
+            # Otherwise just override/add the value
+            result[key] = copy.deepcopy(value)
+    return result
 
 
 def main() -> None:

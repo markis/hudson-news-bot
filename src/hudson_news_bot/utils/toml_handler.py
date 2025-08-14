@@ -3,7 +3,7 @@
 import tomllib
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 
 from hudson_news_bot.news.models import NewsCollection, NewsItem
@@ -13,11 +13,11 @@ class TOMLHandler:
     """Handles TOML parsing and writing operations."""
 
     @staticmethod
-    def load_config(config_path: str | Path) -> Dict[str, Any]:
+    def load_config(config_path: str | Path) -> dict[str, Any]:
         """Load configuration from TOML file."""
         config_path = Path(config_path)
         if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+            return {}
 
         with open(config_path, "rb") as f:
             return tomllib.load(f)

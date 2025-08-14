@@ -163,7 +163,7 @@ class DuplicationChecker:
 
         return normalized
 
-    def is_duplicate(self, news_item: NewsItem) -> tuple[bool, str | None]:
+    async def is_duplicate(self, news_item: NewsItem) -> tuple[bool, str | None]:
         """Check if news item is a duplicate.
 
         Args:
@@ -183,7 +183,7 @@ class DuplicationChecker:
             return is_dup, reason
 
         # Check Reddit submissions
-        is_dup, reason = self._check_reddit_submissions(news_item)
+        is_dup, reason = await self._check_reddit_submissions(news_item)
         if is_dup:
             # Store in local database for future reference
             self._store_submission(news_item, source="reddit")
@@ -237,7 +237,9 @@ class DuplicationChecker:
 
         return False, None
 
-    def _check_reddit_submissions(self, news_item: NewsItem) -> tuple[bool, str | None]:
+    async def _check_reddit_submissions(
+        self, news_item: NewsItem
+    ) -> tuple[bool, str | None]:
         """Check Reddit for existing submissions.
 
         Args:
@@ -254,7 +256,7 @@ class DuplicationChecker:
         ]
 
         for query in search_queries:
-            submissions = self.reddit_client.search_submissions(
+            submissions = await self.reddit_client.search_submissions(
                 query, limit=self.config.max_search_results
             )
 
