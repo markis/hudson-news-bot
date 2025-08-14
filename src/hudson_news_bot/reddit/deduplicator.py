@@ -248,7 +248,27 @@ class DuplicationChecker:
         Returns:
             Tuple of (is_duplicate, reason)
         """
-        # Search by URL domain
+        # First check bot's own submissions
+        user_submissions = await self.reddit_client.get_user_submissions(
+            limit=self.config.max_search_results
+        )
+
+        for submission in user_submissions:
+            # Check URL similarity
+            if self._urls_are_similar(news_item.link, submission.url):
+                return (
+                    True,
+                    f"Already submitted by bot: {submission.url} (ID: {submission.id})",
+                )
+
+            # Check title similarity
+            if self._titles_are_similar(news_item.headline, submission.title):
+                return (
+                    True,
+                    f"Similar title already submitted by bot: {submission.title} (ID: {submission.id})",
+                )
+
+        # Search by URL domain in subreddit
         domain = urllib.parse.urlparse(news_item.link).netloc
         search_queries = [
             f"site:{domain}",

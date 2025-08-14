@@ -2,6 +2,7 @@
 
 import asyncio
 import sys
+from datetime import datetime, timedelta
 from typing import Any, List, Optional
 
 from hudson_news_bot.config.settings import Config
@@ -93,13 +94,29 @@ class NewsBot:
                 self.logger.info(f"Saving news items to {output_file}")
                 TOMLHandler.write_news_toml(news_collection, output_file)
 
+            # Step 3.5: Filter by date (only keep today and yesterday)
+            self.logger.info("Filtering news items by date...")
+            date_filtered_items = self._filter_by_date(news_collection)
+
+            if len(date_filtered_items) < len(news_collection):
+                filtered_count = len(news_collection) - len(date_filtered_items)
+                self.logger.info(
+                    f"Filtered out {filtered_count} items older than yesterday"
+                )
+
+            if not date_filtered_items:
+                self.logger.info(
+                    "No recent news items found (all items are older than yesterday)"
+                )
+                return True
+
             # Step 4: Filter duplicates
             if dry_run:
                 self.logger.info("Skipping duplicate check for dry run")
-                unique_news_items = list(news_collection)
+                unique_news_items = list(date_filtered_items)
             else:
                 self.logger.info("Checking for duplicates...")
-                unique_news_items = await self._filter_duplicates(news_collection)
+                unique_news_items = await self._filter_duplicates(date_filtered_items)
 
             if not unique_news_items:
                 self.logger.info("All news items were duplicates, nothing to post")
@@ -159,6 +176,32 @@ class NewsBot:
                 unique_items.append(news_item)
 
         return unique_items
+
+    def _filter_by_date(self, news_collection: NewsCollection) -> NewsCollection:
+        """Filter news items to only include those from today and yesterday.
+
+        Args:
+            news_collection: Collection of news items to filter
+
+        Returns:
+            NewsCollection with items from today and yesterday only
+        """
+        yesterday = (datetime.now() - timedelta(days=1)).date()
+
+        filtered_collection = NewsCollection()
+
+        for news_item in news_collection:
+            # Extract date from publication_date (it's a datetime object)
+            item_date = news_item.publication_date.date()
+
+            if item_date >= yesterday:  # Include today and yesterday
+                filtered_collection.add_item(news_item)
+            else:
+                self.logger.debug(
+                    f"Filtering out old item: {news_item.headline} (published: {item_date})"
+                )
+
+        return filtered_collection
 
     def get_statistics(self) -> dict[str, Any]:
         """Get bot statistics.

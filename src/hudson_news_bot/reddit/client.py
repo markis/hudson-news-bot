@@ -223,6 +223,35 @@ class RedditClient:
             self.logger.error(f"Error getting recent submissions: {e}")
             return []
 
+    async def get_user_submissions(self, limit: int = 100) -> list[Submission]:
+        """Get recent submissions from the authenticated user.
+
+        Args:
+            limit: Maximum number of submissions to retrieve
+
+        Returns:
+            List of user's recent submissions
+        """
+        reddit = await self._get_reddit_instance()
+
+        try:
+            user = await reddit.user.me()
+            if not user:
+                self.logger.warning(
+                    "No authenticated user available for submission check"
+                )
+                return []
+
+            submissions = [
+                submission async for submission in user.submissions.new(limit=limit)
+            ]
+            self.logger.debug(f"Retrieved {len(submissions)} user submissions")
+            return submissions
+
+        except Exception as e:
+            self.logger.error(f"Error getting user submissions: {e}")
+            return []
+
     async def test_connection(self) -> bool:
         """Test Reddit API connection.
 

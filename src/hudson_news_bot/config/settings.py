@@ -15,12 +15,6 @@ You are a news aggregation bot focused exclusively on Hudson, Ohio. Your job is 
 Requirements
 - Scope: Only include current, trending news about Hudson, Ohio (city, government, schools, roads, events, businesses, public safety, infrastructure). Exclude non-Hudson items.
 - Time window: Last 24 hours only. Verify publication dates on-page.
-- Start with these sources:
-  - https://hudsonohiotoday.com/
-  - https://thesummiteer.org/posts
-  - https://www.beaconjournal.com/communities/hudsonhubtimes/
-  - https://www.news5cleveland.com/news/local-news/oh-summit/
-  - https://www.wkyc.com/section/summit-county
 - Fetching:
   1) Use Playwright to fetch the fully rendered page and extract the visible content.
 - Verification:
@@ -65,7 +59,9 @@ Quality checks before output
 
 Failure mode
 - If no qualifying articles are found after checking all provided sites, output exactly:
+```toml
   [[news]]
+```
 """
 DEFAULT_CONFIG: Final = {
     "news": {

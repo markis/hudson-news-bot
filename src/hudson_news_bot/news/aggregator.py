@@ -119,8 +119,10 @@ class NewsAggregator:
             f"Today is {today} and I need you to find up to {self.config.max_articles} articles from these websites."
             """
             - https://hudsonohiotoday.com/
-            - https://thesummiteer.org/posts
             - https://www.beaconjournal.com/communities/hudsonhubtimes/
+            - https://fox8.com/tag/hudson-news/
+            - https://www.cleveland.com/topic/hudson/
+            - https://thesummiteer.org/posts
             - https://www.news5cleveland.com/news/local-news/oh-summit/
             - https://www.wkyc.com/section/summit-county
             """
