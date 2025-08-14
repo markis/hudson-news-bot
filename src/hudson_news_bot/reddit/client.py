@@ -1,12 +1,12 @@
 """Reddit API client using Async PRAW."""
 
 import asyncio
+from logging import Logger
 import sys
-from typing import Any
 
 import asyncpraw  # type: ignore
 from asyncpraw.exceptions import AsyncPRAWException, RedditAPIException  # type: ignore
-from asyncpraw.models import Submission  # type: ignore
+from asyncpraw.models import Submission, Subreddit  # type: ignore
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsItem
@@ -16,6 +16,11 @@ from hudson_news_bot.utils.logging import get_logger
 class RedditClient:
     """Reddit API client for posting news articles."""
 
+    config: Config
+    logger: Logger
+    _reddit: asyncpraw.Reddit | None = None
+    _subreddit: Subreddit | None = None
+
     def __init__(self, config: Config):
         """Initialize Reddit client.
 
@@ -24,8 +29,6 @@ class RedditClient:
         """
         self.config = config
         self.logger = get_logger("reddit.client")
-        self._reddit: asyncpraw.Reddit | None = None
-        self._subreddit = None
 
     async def _get_reddit_instance(self) -> asyncpraw.Reddit:
         """Get or create Reddit instance.
@@ -76,11 +79,11 @@ class RedditClient:
         if self._reddit:
             await self._reddit.close()
 
-    async def _get_subreddit(self) -> Any:
+    async def _get_subreddit(self) -> Subreddit:
         """Get subreddit instance."""
         if self._subreddit is None:
             reddit = await self._get_reddit_instance()
-            self._subreddit = reddit.subreddit(self.config.subreddit_name)
+            self._subreddit = await reddit.subreddit(self.config.subreddit_name)
             self.logger.info(f"Connected to subreddit: r/{self.config.subreddit_name}")
 
         return self._subreddit
@@ -114,7 +117,9 @@ class RedditClient:
         try:
             submission = await subreddit.submit(title=title, url=news_item.link)
 
-            self.logger.info(f"Successfully submitted: {submission.url}")
+            # Construct the submission URL since submission.url requires loading
+            submission_url = f"https://reddit.com/r/{self.config.subreddit_name}/comments/{submission.id}"
+            self.logger.info(f"Successfully submitted: {submission_url}")
             return submission
 
         except RedditAPIException as e:

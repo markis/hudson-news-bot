@@ -277,7 +277,7 @@ class DuplicationChecker:
 
                 # Check for duplicates using Reddit's built-in feature
                 try:
-                    for duplicate in submission.duplicates():
+                    async for duplicate in submission.duplicates():
                         if self._urls_are_similar(news_item.link, duplicate.url):
                             return (
                                 True,
