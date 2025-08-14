@@ -30,6 +30,10 @@ class NewsBot:
         self.reddit_client = RedditClient(config)
         self.deduplicator = DuplicationChecker(self.reddit_client, config)
 
+    async def cleanup(self) -> None:
+        """Clean up resources."""
+        await self.reddit_client.close()
+
     async def run(
         self, dry_run: bool = False, output_file: Optional[str] = None
     ) -> bool:
@@ -206,6 +210,8 @@ async def main() -> None:
 
     logger = get_logger("main")
 
+    bot: Optional[NewsBot] = None
+
     try:
         # Load configuration
         config = Config(args.config)
@@ -226,32 +232,42 @@ async def main() -> None:
         if args.test_connections:
             logger.info("Testing connections...")
 
-            # Test Reddit
-            reddit_ok = await bot.reddit_client.test_connection()
+            try:
+                # Test Reddit
+                reddit_ok = await bot.reddit_client.test_connection()
 
-            # Test Claude SDK
-            from hudson_news_bot.news.aggregator import test_connection
+                # Test Claude SDK
+                from hudson_news_bot.news.aggregator import test_connection
 
-            claude_ok = await test_connection()
+                claude_ok = await test_connection()
 
-            if reddit_ok and claude_ok:
-                logger.info("✅ All connections successful")
-                sys.exit(0)
-            else:
-                logger.error("❌ Some connections failed")
-                sys.exit(1)
+                if reddit_ok and claude_ok:
+                    logger.info("✅ All connections successful")
+                    sys.exit(0)
+                else:
+                    logger.error("❌ Some connections failed")
+                    sys.exit(1)
+            finally:
+                await bot.cleanup()
 
         # Run main workflow
-        success = await bot.run(dry_run=args.dry_run, output_file=args.output)
+        try:
+            success = await bot.run(dry_run=args.dry_run, output_file=args.output)
+        finally:
+            await bot.cleanup()
 
         sys.exit(0 if success else 1)
 
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
+        if bot is not None:
+            await bot.cleanup()
         sys.exit(1)
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         logger.exception("Full error details:")
+        if bot is not None:
+            await bot.cleanup()
         sys.exit(1)
 
 
