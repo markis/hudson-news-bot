@@ -2,9 +2,10 @@
 
 import asyncio
 import datetime
+from logging import Logger
 import re
 import sys
-from typing import Optional
+from typing import Final, Optional
 
 from claude_code_sdk import (
     AssistantMessage,
@@ -21,6 +22,10 @@ from hudson_news_bot.utils.toml_handler import TOMLHandler
 
 class NewsAggregator:
     """Handles news aggregation using Claude Code SDK."""
+
+    config: Final[Config]
+    logger: Final[Logger]
+    options: Final[ClaudeCodeOptions]
 
     def __init__(self, config: Config):
         """Initialize the news aggregator.

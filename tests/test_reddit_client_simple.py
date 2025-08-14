@@ -1,8 +1,9 @@
 """Tests for Reddit API client - simplified version."""
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from asyncpraw.exceptions import AsyncPRAWException, RedditAPIException  # type: ignore
 
 from hudson_news_bot.config.settings import Config
@@ -36,6 +37,7 @@ class TestRedditClient:
 
         assert client.config == self.mock_config
 
+    @pytest.mark.asyncio
     @patch.object(RedditClient, "_get_subreddit")
     async def test_submit_news_item_dry_run(
         self, mock_get_subreddit: MagicMock
@@ -46,15 +48,16 @@ class TestRedditClient:
 
         assert result is None
 
+    @pytest.mark.asyncio
     @patch.object(RedditClient, "_get_subreddit")
     async def test_submit_news_item_success(
-        self, mock_get_subreddit: MagicMock
+        self, mock_get_subreddit: AsyncMock
     ) -> None:
         """Test successful news item submission."""
         mock_subreddit = MagicMock()
         mock_submission = MagicMock()
         mock_submission.url = "https://reddit.com/r/test/123"
-        mock_subreddit.submit.return_value = mock_submission
+        mock_subreddit.submit = AsyncMock(return_value=mock_submission)
         mock_get_subreddit.return_value = mock_subreddit
 
         client = RedditClient(self.mock_config)
@@ -62,9 +65,10 @@ class TestRedditClient:
 
         assert result == mock_submission
 
+    @pytest.mark.asyncio
     @patch.object(RedditClient, "_get_subreddit")
     async def test_submit_news_item_reddit_api_exception(
-        self, mock_get_subreddit: MagicMock
+        self, mock_get_subreddit: AsyncMock
     ) -> None:
         """Test news item submission with Reddit API exception."""
         mock_subreddit = MagicMock()
@@ -74,7 +78,7 @@ class TestRedditClient:
         mock_error_item.message = "That link has already been submitted"
 
         mock_exception = RedditAPIException([mock_error_item])
-        mock_subreddit.submit.side_effect = mock_exception
+        mock_subreddit.submit = AsyncMock(side_effect=mock_exception)
         mock_get_subreddit.return_value = mock_subreddit
 
         client = RedditClient(self.mock_config)
@@ -82,13 +86,16 @@ class TestRedditClient:
 
         assert result is None
 
+    @pytest.mark.asyncio
     @patch.object(RedditClient, "_get_subreddit")
     async def test_submit_news_item_praw_exception(
-        self, mock_get_subreddit: MagicMock
+        self, mock_get_subreddit: AsyncMock
     ) -> None:
         """Test news item submission with AsyncPRAW exception."""
         mock_subreddit = MagicMock()
-        mock_subreddit.submit.side_effect = AsyncPRAWException("AsyncPRAW error")
+        mock_subreddit.submit = AsyncMock(
+            side_effect=AsyncPRAWException("AsyncPRAW error")
+        )
         mock_get_subreddit.return_value = mock_subreddit
 
         client = RedditClient(self.mock_config)
@@ -96,6 +103,7 @@ class TestRedditClient:
 
         assert result is None
 
+    @pytest.mark.asyncio
     @patch.object(RedditClient, "submit_news_item")
     async def test_submit_multiple_news_items_dry_run(
         self, mock_submit: MagicMock
@@ -112,17 +120,21 @@ class TestRedditClient:
         assert all(r is None for r in results)
         assert mock_submit.call_count == 2
 
+    @pytest.mark.asyncio
     @patch.object(RedditClient, "_get_subreddit")
     async def test_search_submissions_success(
-        self, mock_get_subreddit: MagicMock
+        self, mock_get_subreddit: AsyncMock
     ) -> None:
         """Test successful submission search."""
         mock_subreddit = MagicMock()
         mock_submissions = [MagicMock(), MagicMock()]
-        # Mock the async iteration
-        mock_subreddit.search.return_value.__aiter__ = lambda: iter(
-            mock_submissions
-        ).__iter__()
+
+        # Create an async iterator mock
+        async def async_iter():
+            for submission in mock_submissions:
+                yield submission
+
+        mock_subreddit.search.return_value = async_iter()
         mock_get_subreddit.return_value = mock_subreddit
 
         client = RedditClient(self.mock_config)
@@ -130,17 +142,21 @@ class TestRedditClient:
 
         assert results == mock_submissions
 
+    @pytest.mark.asyncio
     @patch.object(RedditClient, "_get_subreddit")
     async def test_get_recent_submissions_success(
-        self, mock_get_subreddit: MagicMock
+        self, mock_get_subreddit: AsyncMock
     ) -> None:
         """Test successful recent submissions retrieval."""
         mock_subreddit = MagicMock()
         mock_submissions = [MagicMock(), MagicMock()]
-        # Mock the async iteration
-        mock_subreddit.new.return_value.__aiter__ = lambda: iter(
-            mock_submissions
-        ).__iter__()
+
+        # Create an async iterator mock
+        async def async_iter():
+            for submission in mock_submissions:
+                yield submission
+
+        mock_subreddit.new.return_value = async_iter()
         mock_get_subreddit.return_value = mock_subreddit
 
         client = RedditClient(self.mock_config)
@@ -148,6 +164,7 @@ class TestRedditClient:
 
         assert results == mock_submissions
 
+    @pytest.mark.asyncio
     @patch.object(RedditClient, "_get_reddit_instance")
     @patch.object(RedditClient, "_get_subreddit")
     async def test_test_connection_success(
@@ -169,6 +186,7 @@ class TestRedditClient:
 
         assert result is True
 
+    @pytest.mark.asyncio
     @patch.object(RedditClient, "_get_reddit_instance")
     async def test_test_connection_failure(self, mock_get_reddit: MagicMock) -> None:
         """Test connection test failure."""

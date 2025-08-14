@@ -29,7 +29,7 @@ class TestLoggingUtilities:
         with tempfile.TemporaryDirectory() as temp_dir:
             log_file = Path(temp_dir) / "test.log"
 
-            logger = setup_logging(log_file=str(log_file))
+            setup_logging(log_file=str(log_file))
 
             # Log file should be created
             assert log_file.exists()

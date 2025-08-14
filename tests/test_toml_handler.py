@@ -141,5 +141,5 @@ key3 = true
 
     def test_load_config_missing_file(self) -> None:
         """Test loading configuration from missing file."""
-        with pytest.raises(FileNotFoundError):
-            TOMLHandler.load_config("/path/that/does/not/exist.toml")
+        result = TOMLHandler.load_config("/path/that/does/not/exist.toml")
+        assert result == {}

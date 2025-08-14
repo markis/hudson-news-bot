@@ -5,6 +5,8 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from hudson_news_bot.news.models import NewsItem
 from hudson_news_bot.reddit.deduplicator import DuplicationChecker
 
@@ -116,6 +118,7 @@ class TestDuplicationChecker:
         assert "URL already submitted" in reason
         assert "test123" in reason
 
+    @pytest.mark.asyncio
     async def test_check_duplicates_disabled(self) -> None:
         """Test that duplicate checking can be disabled."""
         self.mock_config.check_for_duplicates = False

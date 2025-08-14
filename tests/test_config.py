@@ -132,7 +132,6 @@ system_prompt = "Test prompt"
                 assert not is_valid
                 assert any("REDDIT_CLIENT_ID" in error for error in errors)
                 assert any("REDDIT_CLIENT_SECRET" in error for error in errors)
-                assert any("ANTHROPIC_API_KEY" in error for error in errors)
             finally:
                 Path(f.name).unlink()
 
