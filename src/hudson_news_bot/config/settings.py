@@ -5,9 +5,50 @@ import os
 import sys
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Final, cast
+from typing import Any, Final, TypedDict, cast
 
 from hudson_news_bot.utils.toml_handler import TOMLHandler
+
+
+class NewsConfig(TypedDict):
+    """Configuration for news aggregation."""
+
+    max_articles: int
+    system_prompt: str
+    news_sites: list[str]
+
+
+class RedditConfig(TypedDict):
+    """Configuration for Reddit integration."""
+
+    subreddit: str
+    user_agent: str
+    check_for_duplicates: bool
+    max_search_results: int
+
+
+class ClaudeConfig(TypedDict):
+    """Configuration for Claude SDK."""
+
+    max_turns: int
+    permission_mode: str
+    timeout_seconds: int
+
+
+class DatabaseConfig(TypedDict):
+    """Configuration for database."""
+
+    path: str
+
+
+class ConfigDict(TypedDict):
+    """Complete configuration structure."""
+
+    news: NewsConfig
+    reddit: RedditConfig
+    claude: ClaudeConfig
+    database: DatabaseConfig
+
 
 DEFAULT_SYSTEM_PROMPT: Final = """
 You are a news aggregation bot focused exclusively on Hudson, Ohio.
@@ -67,10 +108,18 @@ Failure mode
   [[news]]
 ```
 """
-DEFAULT_CONFIG: Final = {
+DEFAULT_CONFIG: Final[ConfigDict] = {
     "news": {
         "max_articles": 5,
         "system_prompt": DEFAULT_SYSTEM_PROMPT,
+        "news_sites": [
+            "https://hudsonohiotoday.com/",
+            "https://www.beaconjournal.com/communities/hudsonhubtimes/",
+            "https://fox8.com/tag/hudson-news/",
+            "https://thesummiteer.org/posts",
+            "https://www.news5cleveland.com/news/local-news/oh-summit/",
+            "https://www.wkyc.com/section/summit-county",
+        ],
     },
     "reddit": {
         "subreddit": "news",
@@ -113,7 +162,7 @@ class Config:
     def _get_config_data(self, config_path: Path) -> dict[str, Any]:
         """Load configuration data from the specified TOML file."""
         data = TOMLHandler.load_config(config_path)
-        return deep_merge_dicts(DEFAULT_CONFIG, data)
+        return deep_merge_dicts(cast(dict[str, Any], DEFAULT_CONFIG), data)
 
     @cached_property
     def subreddit_name(self) -> str:
@@ -166,6 +215,13 @@ class Config:
     def database_path(self) -> str:
         """Database path for submission tracking."""
         return str(self._data.get("database", {}).get("path", "data/submissions.db"))
+
+    @cached_property
+    def news_sites(self) -> list[str]:
+        """Get list of news sites to scrape."""
+        default_sites: list[str] = []
+        sites: list[str] = self._data.get("news", {}).get("news_sites", default_sites)
+        return sites
 
     @cached_property
     def anthropic_api_key(self) -> str | None:

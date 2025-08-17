@@ -169,14 +169,29 @@ link = "https://hudsonohiotoday.com/new-park"
         )
 
     @pytest.mark.asyncio
+    @patch("hudson_news_bot.news.aggregator.WebsiteScraper")
     @patch("hudson_news_bot.news.aggregator.ClaudeSDKClient")
     async def test_aggregate_news_success(
         self,
         mock_claude_client_class: MagicMock,
+        mock_scraper_class: MagicMock,
         aggregator: NewsAggregator,
         sample_toml_response: str,
         expected_news_collection: NewsCollection,
     ) -> None:
+        # Mock scraper
+        mock_scraper_instance = AsyncMock()
+        mock_scraper_class.return_value = mock_scraper_instance
+        mock_scraper_instance.scrape_news_sites.return_value = [
+            {
+                "url": "https://hudsonohiotoday.com/article1",
+                "headline": "Test Article",
+                "date": "2025-08-14",
+                "content": "Test content",
+            }
+        ]
+
+        # Mock Claude client
         mock_client_instance = AsyncMock()
         mock_claude_client_class.return_value.__aenter__ = AsyncMock(
             return_value=mock_client_instance
@@ -198,8 +213,7 @@ link = "https://hudsonohiotoday.com/new-park"
         mock_client_instance.query.assert_called_once()
         query_call = mock_client_instance.query.call_args[0][0]
         assert "2025-" in query_call
-        assert "3 articles" in query_call
-        assert "hudsonohiotoday.com" in query_call
+        assert "Test Article" in query_call
 
         assert len(result) == 2
         assert result.news[0].headline == expected_news_collection.news[0].headline
@@ -207,10 +221,27 @@ link = "https://hudsonohiotoday.com/new-park"
         assert result.news[1].headline == expected_news_collection.news[1].headline
 
     @pytest.mark.asyncio
+    @patch("hudson_news_bot.news.aggregator.WebsiteScraper")
     @patch("hudson_news_bot.news.aggregator.ClaudeSDKClient")
     async def test_aggregate_news_no_response(
-        self, mock_claude_client_class: MagicMock, aggregator: NewsAggregator
+        self,
+        mock_claude_client_class: MagicMock,
+        mock_scraper_class: MagicMock,
+        aggregator: NewsAggregator,
     ) -> None:
+        # Mock scraper
+        mock_scraper_instance = AsyncMock()
+        mock_scraper_class.return_value = mock_scraper_instance
+        mock_scraper_instance.scrape_news_sites.return_value = [
+            {
+                "url": "https://hudsonohiotoday.com/article1",
+                "headline": "Test Article",
+                "date": "2025-08-14",
+                "content": "Test content",
+            }
+        ]
+
+        # Mock Claude client
         mock_client_instance = AsyncMock()
         mock_claude_client_class.return_value.__aenter__ = AsyncMock(
             return_value=mock_client_instance
@@ -227,10 +258,27 @@ link = "https://hudsonohiotoday.com/new-park"
             await aggregator.aggregate_news()
 
     @pytest.mark.asyncio
+    @patch("hudson_news_bot.news.aggregator.WebsiteScraper")
     @patch("hudson_news_bot.news.aggregator.ClaudeSDKClient")
     async def test_aggregate_news_non_text_response(
-        self, mock_claude_client_class: MagicMock, aggregator: NewsAggregator
+        self,
+        mock_claude_client_class: MagicMock,
+        mock_scraper_class: MagicMock,
+        aggregator: NewsAggregator,
     ) -> None:
+        # Mock scraper
+        mock_scraper_instance = AsyncMock()
+        mock_scraper_class.return_value = mock_scraper_instance
+        mock_scraper_instance.scrape_news_sites.return_value = [
+            {
+                "url": "https://hudsonohiotoday.com/article1",
+                "headline": "Test Article",
+                "date": "2025-08-14",
+                "content": "Test content",
+            }
+        ]
+
+        # Mock Claude client
         mock_client_instance = AsyncMock()
         mock_claude_client_class.return_value.__aenter__ = AsyncMock(
             return_value=mock_client_instance
@@ -250,10 +298,27 @@ link = "https://hudsonohiotoday.com/new-park"
             await aggregator.aggregate_news()
 
     @pytest.mark.asyncio
+    @patch("hudson_news_bot.news.aggregator.WebsiteScraper")
     @patch("hudson_news_bot.news.aggregator.ClaudeSDKClient")
     async def test_aggregate_news_invalid_toml(
-        self, mock_claude_client_class: MagicMock, aggregator: NewsAggregator
+        self,
+        mock_claude_client_class: MagicMock,
+        mock_scraper_class: MagicMock,
+        aggregator: NewsAggregator,
     ) -> None:
+        # Mock scraper
+        mock_scraper_instance = AsyncMock()
+        mock_scraper_class.return_value = mock_scraper_instance
+        mock_scraper_instance.scrape_news_sites.return_value = [
+            {
+                "url": "https://hudsonohiotoday.com/article1",
+                "headline": "Test Article",
+                "date": "2025-08-14",
+                "content": "Test content",
+            }
+        ]
+
+        # Mock Claude client
         mock_client_instance = AsyncMock()
         mock_claude_client_class.return_value.__aenter__ = AsyncMock(
             return_value=mock_client_instance
@@ -274,10 +339,27 @@ link = "https://hudsonohiotoday.com/new-park"
             await aggregator.aggregate_news()
 
     @pytest.mark.asyncio
+    @patch("hudson_news_bot.news.aggregator.WebsiteScraper")
     @patch("hudson_news_bot.news.aggregator.ClaudeSDKClient")
     async def test_aggregate_news_no_toml_content(
-        self, mock_claude_client_class: MagicMock, aggregator: NewsAggregator
+        self,
+        mock_claude_client_class: MagicMock,
+        mock_scraper_class: MagicMock,
+        aggregator: NewsAggregator,
     ) -> None:
+        # Mock scraper
+        mock_scraper_instance = AsyncMock()
+        mock_scraper_class.return_value = mock_scraper_instance
+        mock_scraper_instance.scrape_news_sites.return_value = [
+            {
+                "url": "https://hudsonohiotoday.com/article1",
+                "headline": "Test Article",
+                "date": "2025-08-14",
+                "content": "Test content",
+            }
+        ]
+
+        # Mock Claude client
         mock_client_instance = AsyncMock()
         mock_claude_client_class.return_value.__aenter__ = AsyncMock(
             return_value=mock_client_instance
@@ -351,11 +433,25 @@ Additional text after TOML"""
         result = aggregator.extract_toml_from_response(response)
         assert result is None
 
-    def test_create_aggregation_prompt(self, aggregator: NewsAggregator) -> None:
-        prompt = aggregator.create_aggregation_prompt()
+    def test_create_analysis_prompt(self, aggregator: NewsAggregator) -> None:
+        articles = [
+            {
+                "url": "https://hudsonohiotoday.com/article1",
+                "headline": "Test Article 1",
+                "date": "2025-08-14",
+                "content": "Test content 1",
+            },
+            {
+                "url": "https://beaconjournal.com/article2",
+                "headline": "Test Article 2",
+                "date": "2025-08-13",
+                "content": "Test content 2",
+            },
+        ]
+        prompt = aggregator.create_analysis_prompt(articles)
 
         assert "2025-" in prompt
-        assert "10 articles" in prompt
+        assert "Test Article 1" in prompt
+        assert "Test Article 2" in prompt
         assert "hudsonohiotoday.com" in prompt
         assert "beaconjournal.com" in prompt
-        assert "fox8.com" in prompt

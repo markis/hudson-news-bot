@@ -1,26 +1,16 @@
 [news]
 max_articles = 5
-system_prompt = """You are a news aggregation bot. Use web search tools to discover 5 current trending news stories from reliable sources like BBC, Reuters, AP News, NPR, etc. For each story, extract:
-- headline (clear, concise)
-- summary (2-3 sentences max)
-- publication_date (YYYY-MM-DD format)
-- link (original source URL)
-
-IMPORTANT: You MUST format your response as valid TOML using this EXACT structure with NO additional text:
-
-[[news]]
-headline = "story headline"
-summary = "brief summary"
-publication_date = "2025-08-13"
-link = "https://source.com/article"
-
-[[news]]
-headline = "second story headline"
-summary = "second story summary"
-publication_date = "2025-08-13"
-link = "https://source.com/second-article"
-
-Do NOT include any explanatory text, greetings, or anything else - ONLY the TOML data above. Use web search to find real, current news from the last 24 hours."""
+# This system prompt is now used internally by the NewsAggregator
+system_prompt = """You are a news article analyzer that reviews scraped content."""
+# News sites to scrape for Hudson, Ohio news
+news_sites = [
+  "https://hudsonohiotoday.com/",
+  "https://www.beaconjournal.com/communities/hudsonhubtimes/",
+  "https://fox8.com/tag/hudson-news/",
+  "https://thesummiteer.org/posts",
+  "https://www.news5cleveland.com/news/local-news/oh-summit/",
+  "https://www.wkyc.com/section/summit-county",
+]
 
 [reddit]
 subreddit = "hudsonoh"

@@ -1,11 +1,11 @@
-"""News aggregation using Claude Code SDK."""
+"""News aggregation using website scraping and Claude for article identification."""
 
 import asyncio
 import datetime
 from logging import Logger
 import re
 import sys
-from typing import Final, Optional
+from typing import Final, List, Optional
 
 from claude_code_sdk import (
     AssistantMessage,
@@ -16,8 +16,18 @@ from claude_code_sdk import (
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsCollection
+from hudson_news_bot.news.scraper import WebsiteScraper
 from hudson_news_bot.utils.logging import get_logger
 from hudson_news_bot.utils.toml_handler import TOMLHandler
+
+SYSTEM_PROMPT: Final = """You are a news article analyzer. Your task is to:
+1. Review the scraped article content provided
+2. Identify the newest/most recent articles
+3. Extract key information from each article
+4. Format the output as valid TOML
+
+Focus on finding local Hudson, Ohio news articles from the last 24-48 hours.
+Prioritize articles with clear dates and local relevance."""
 
 
 class NewsAggregator:
@@ -36,8 +46,7 @@ class NewsAggregator:
         self.config = config
         self.logger = get_logger("news.aggregator")
 
-        # Configure Claude SDK options
-        # Use bypassPermissions to allow web access for fetching real news
+        # Configure Claude SDK options for analyzing scraped content
         self.options = ClaudeCodeOptions(
             system_prompt=config.system_prompt,
             max_turns=config.claude_max_turns,
@@ -45,38 +54,13 @@ class NewsAggregator:
             disallowed_tools=["WebFetch", "WebSearch"],
             allowed_tools=[
                 "Task",
-                "Read",
-                "ListMcpResourcesTool",
-                "ReadMcpResourceTool",
-                "mcp__playwright__browser_close",
-                "mcp__playwright__browser_resize",
-                "mcp__playwright__browser_console_messages",
-                "mcp__playwright__browser_handle_dialog",
-                "mcp__playwright__browser_evaluate",
-                "mcp__playwright__browser_file_upload",
-                "mcp__playwright__browser_install",
-                "mcp__playwright__browser_press_key",
-                "mcp__playwright__browser_type",
                 "mcp__playwright__browser_navigate",
-                "mcp__playwright__browser_navigate_back",
-                "mcp__playwright__browser_navigate_forward",
-                "mcp__playwright__browser_network_requests",
-                "mcp__playwright__browser_take_screenshot",
-                "mcp__playwright__browser_snapshot",
                 "mcp__playwright__browser_click",
-                "mcp__playwright__browser_drag",
-                "mcp__playwright__browser_hover",
-                "mcp__playwright__browser_select_option",
-                "mcp__playwright__browser_tab_list",
-                "mcp__playwright__browser_tab_new",
-                "mcp__playwright__browser_tab_select",
-                "mcp__playwright__browser_tab_close",
-                "mcp__playwright__browser_wait_for",
             ],
         )
 
     async def aggregate_news(self) -> NewsCollection:
-        """Aggregate news stories using Claude SDK.
+        """Aggregate news stories using website scraping and Claude analysis.
 
         Returns:
             NewsCollection containing discovered news items
@@ -88,9 +72,25 @@ class NewsAggregator:
             f"Starting news aggregation for {self.config.max_articles} articles"
         )
 
+        # Get news sites from configuration
+        news_sites = self.config.news_sites
+
+        # Scrape the websites
+        scraper = WebsiteScraper(self.config)
+        articles = await scraper.scrape_news_sites(news_sites)
+
+        if not articles:
+            self.logger.warning("No articles found from scraping")
+            return NewsCollection()
+
+        self.logger.info(
+            f"Scraped {len(articles)} articles, sending to Claude for analysis"
+        )
+
+        # Send scraped content to Claude for analysis
         async with ClaudeSDKClient(options=self.options) as client:
-            prompt = self.create_aggregation_prompt()
-            self.logger.debug(f"Sending prompt to Claude: {prompt}")
+            prompt = self.create_analysis_prompt(articles)
+            self.logger.debug("Sending analysis prompt to Claude")
 
             # Send query and collect response
             await client.query(prompt)
@@ -113,25 +113,57 @@ class NewsAggregator:
 
         raise Exception("No response received from Claude")
 
-    def create_aggregation_prompt(self) -> str:
-        """Create the prompt for news aggregation.
+    def create_analysis_prompt(self, articles: List[dict[str, Optional[str]]]) -> str:
+        """Create the prompt for Claude to analyze scraped articles.
+
+        Args:
+            articles: List of scraped article dictionaries
 
         Returns:
             Formatted prompt string
         """
         today = datetime.datetime.now().strftime("%Y-%m-%d")
-        return (
-            f"Today is {today} and I need you to find up to {self.config.max_articles} articles from these websites."
-            """
-            - https://hudsonohiotoday.com/
-            - https://www.beaconjournal.com/communities/hudsonhubtimes/
-            - https://fox8.com/tag/hudson-news/
-            - https://www.cleveland.com/topic/hudson/
-            - https://thesummiteer.org/posts
-            - https://www.news5cleveland.com/news/local-news/oh-summit/
-            - https://www.wkyc.com/section/summit-county
-            """
-        )
+
+        # Prepare article summaries for Claude
+        article_summaries = []
+        for i, article in enumerate(articles[:20], 1):  # Limit to first 20 articles
+            summary = f"""
+Article {i}:
+URL: {article.get("url", "N/A")}
+Headline: {article.get("headline", "N/A")}
+Date: {article.get("date", "N/A")}
+Content Preview: {(article.get("content") or "N/A")[:500]}...
+"""
+            article_summaries.append(summary)
+
+        prompt = f"""Today is {today}. I've scraped the following articles from Hudson, Ohio news sites.
+Please analyze them and identify the NEWEST and most relevant local news articles.
+
+{chr(10).join(article_summaries)}
+
+From these articles, select the most recent and relevant Hudson, Ohio news stories.
+For each selected article, format your response as valid TOML using this EXACT structure:
+
+[[news]]
+headline = "story headline"
+summary = "brief 2-3 sentence summary of the article"
+publication_date = "YYYY-MM-DD"
+link = "https://source.com/article"
+
+[[news]]
+headline = "second story headline"
+summary = "second story summary"
+publication_date = "YYYY-MM-DD"
+link = "https://source.com/second-article"
+
+IMPORTANT:
+- Only include articles that are clearly about Hudson, Ohio or directly relevant to Hudson residents
+- Prioritize the most recent articles (from today or yesterday)
+- Ensure dates are in YYYY-MM-DD format
+- Write clear, concise summaries that capture the key points
+- Output ONLY the TOML data, no explanatory text"""
+
+        return prompt
 
     def _parse_response(self, response: str) -> NewsCollection:
         """Parse Claude's response into NewsCollection.
