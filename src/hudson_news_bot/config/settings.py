@@ -45,7 +45,7 @@ Process
    - Confirm explicit Hudson, Ohio relevance (title/body/section tags).
    - Ensure the final URL is publicly accessible without login.
 4) Extract
-   - headline: from  or on-page headline (h1). Clean site name suffixes.
+   - headline: from or on-page headline (h1). Clean site name suffixes.
    - summary: 2–3 sentences capturing the core facts (who/what/where/when). Avoid opinions and boilerplate.
    - publication_date: normalize to YYYY-MM-DD from the page timestamp; if only time is shown, infer date from site timezone (local area).
    - link: canonical article URL.
@@ -58,6 +58,8 @@ Quality checks before output
 - No more than 5 items.
 - No non-Hudson items.
 - TOML parses successfully.
+
+If you find content on www.hudson.oh.us, you have to find urls with a query string parameter `AID=number` to get the full article. For example, https://www.hudson.oh.us/CivicAlerts.aspx?AID=3667. URLS without this parameter are not valid articles.
 
 Failure mode
 - If no qualifying articles are found after checking all provided sites, output exactly:
@@ -208,13 +210,6 @@ class Config:
 
         if not self.reddit_client_secret:
             errors.append("REDDIT_CLIENT_SECRET environment variable is required")
-
-        # Check Claude authentication
-        # if not self.anthropic_api_key:
-        #     # Check if Claude CLI might be logged in (this is harder to verify)
-        #     errors.append(
-        #         "ANTHROPIC_API_KEY not found. Ensure 'claude login' is completed or set API key"
-        #     )
 
         # Validate config values
         if self.max_articles <= 0:

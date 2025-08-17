@@ -9,6 +9,9 @@ description = "News aggregation bot with Reddit integration using Claude SDK"
 requires-python = ">=3.12"
 dependencies = ["asyncpraw>=7.8.1", "claude-code-sdk>=0.0.20", "tomli-w>=1.2.0"]
 
+[project.scripts]
+hudson-news-bot = "hudson_news_bot.main:sync_main"
+
 [dependency-groups]
 dev = [
   "bandit>=1.8.6",

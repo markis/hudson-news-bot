@@ -314,5 +314,10 @@ async def main() -> None:
         sys.exit(1)
 
 
-if __name__ == "__main__":
+def sync_main() -> None:
+    """Synchronous entry point for compatibility with older Python versions."""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    sync_main()
