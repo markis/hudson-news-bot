@@ -1,8 +1,11 @@
 """Website scraper module using Playwright for JavaScript-rendered content."""
 
 import asyncio
+import hashlib
 import re
-from datetime import datetime
+import sqlite3
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urljoin
 
@@ -29,6 +32,48 @@ class WebsiteScraper:
         self.browser: Browser | None = None
         self.playwright: Playwright | None = None
 
+        # Set up database for tracking scraped URLs
+        self.db_path = Path(config.database_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._init_database()
+
+        # Cache configuration
+        self.skip_recently_scraped = config.skip_recently_scraped
+        self.scraping_cache_hours = config.scraping_cache_hours
+
+    def _init_database(self) -> None:
+        """Initialize SQLite database for tracking scraped articles."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            # Create table for tracking scraped articles
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS scraped_articles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    url TEXT NOT NULL,
+                    url_hash TEXT NOT NULL UNIQUE,
+                    normalized_url TEXT NOT NULL,
+                    headline TEXT,
+                    content_hash TEXT,
+                    scraped_at TIMESTAMP NOT NULL,
+                    scrape_success BOOLEAN DEFAULT 1
+                )
+            """)
+
+            # Create indexes for performance
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_scraped_url_hash ON scraped_articles(url_hash)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_scraped_at ON scraped_articles(scraped_at)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_scrape_success ON scraped_articles(scrape_success)"
+            )
+
+            conn.commit()
+            self.logger.debug("Scraping database initialized")
+
     async def __aenter__(self) -> "WebsiteScraper":
         """Async context manager entry - launch browser."""
         self.playwright = await async_playwright().start()
@@ -47,17 +92,23 @@ class WebsiteScraper:
         if self.playwright:
             await self.playwright.stop()
 
-    async def fetch_website(self, url: str) -> Tuple[str, str]:
+    async def fetch_website(self, url: str, force: bool = False) -> Tuple[str, str]:
         """Fetch HTML content from a website using Playwright.
 
         Args:
             url: Website URL to fetch
+            force: Force fetching even if recently scraped
 
         Returns:
             Tuple of (url, html_content)
         """
         if not self.browser:
             raise RuntimeError("Browser not initialized. Use async context manager.")
+
+        # Check if URL was recently scraped (unless force=True)
+        if not force and self._check_if_recently_scraped(url):
+            self.logger.info(f"Skipping recently scraped URL: {url}")
+            return url, ""
 
         page = None
         try:
@@ -81,13 +132,19 @@ class WebsiteScraper:
             # Get the page content
             html = await page.content()
             self.logger.info(f"Successfully fetched {url} ({len(html)} bytes)")
+
+            # Store successful fetch (will be updated with content later)
+            self._store_scraped_article(url, success=True)
+
             return url, html
 
         except PlaywrightTimeout:
             self.logger.error(f"Timeout fetching {url}")
+            self._store_scraped_article(url, success=False)
             return url, ""
         except Exception as e:
             self.logger.error(f"Failed to fetch {url}: {e}")
+            self._store_scraped_article(url, success=False)
             return url, ""
         finally:
             if page:
@@ -298,7 +355,7 @@ class WebsiteScraper:
             List of unique article dictionaries
         """
         async with self:
-            # Fetch all main pages
+            # Fetch all main pages (these are usually index pages, not cached)
             self.logger.info(f"Fetching {len(sites)} news sites...")
             site_content = await self.fetch_all_websites(sites)
 
@@ -323,14 +380,19 @@ class WebsiteScraper:
                     normalized_url = self._normalize_url(link)
                     if normalized_url not in all_article_urls:
                         all_article_urls.add(normalized_url)
-                        articles_to_fetch.append(link)
+
+                        # Check if already scraped recently
+                        if not self._check_if_recently_scraped(link):
+                            articles_to_fetch.append(link)
+                        else:
+                            self.logger.debug(f"Skipping recently scraped: {link}")
 
             self.logger.info(
-                f"Found {len(articles_to_fetch)} unique article URLs to fetch "
-                f"(deduplicated from {sum(len(self.extract_article_links(html, url)[:5]) for url, html in site_content.items() if html)} total)"
+                f"Found {len(articles_to_fetch)} new article URLs to fetch "
+                f"(filtered from {len(all_article_urls)} unique URLs)"
             )
 
-            # Fetch all unique article pages
+            # Fetch all unique article pages that haven't been scraped recently
             all_articles: list[dict[str, str | None]] = []
             seen_headlines: set[str] = set()
             seen_content_hashes: set[int] = set()
@@ -346,6 +408,12 @@ class WebsiteScraper:
 
                         # Skip if missing required data
                         if not (article_data["headline"] and article_data["content"]):
+                            # Store failed extraction
+                            self._store_scraped_article(
+                                article_url,
+                                headline=article_data.get("headline"),
+                                success=False,
+                            )
                             continue
 
                         # Deduplicate by headline (case-insensitive)
@@ -371,9 +439,24 @@ class WebsiteScraper:
                         seen_content_hashes.add(content_hash)
                         all_articles.append(article_data)
 
+                        # Update stored article with extracted content
+                        self._store_scraped_article(
+                            article_url,
+                            headline=article_data["headline"],
+                            content=article_data["content"],
+                            success=True,
+                        )
+
             self.logger.info(
                 f"Extracted {len(all_articles)} unique articles after deduplication"
             )
+
+            # Clean up old records periodically (every 10th run roughly)
+            import random
+
+            if random.random() < 0.1:
+                self.cleanup_old_scraped_records()
+
             return all_articles
 
     def _normalize_url(self, url: str) -> str:
@@ -410,3 +493,123 @@ class WebsiteScraper:
 
         # Convert to lowercase for comparison
         return url.lower()
+
+    def _hash_string(self, text: str) -> str:
+        """Create hash of string for comparison.
+
+        Args:
+            text: Text to hash
+
+        Returns:
+            SHA-256 hash hex string
+        """
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    def _check_if_recently_scraped(self, url: str) -> bool:
+        """Check if URL was recently scraped.
+
+        Args:
+            url: URL to check
+
+        Returns:
+            True if URL was recently scraped and should be skipped
+        """
+        if not self.skip_recently_scraped:
+            return False
+
+        normalized_url = self._normalize_url(url)
+        url_hash = self._hash_string(normalized_url)
+
+        # Calculate cutoff time
+        cutoff_time = (
+            datetime.now() - timedelta(hours=self.scraping_cache_hours)
+        ).isoformat()
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT scraped_at, scrape_success 
+                FROM scraped_articles 
+                WHERE url_hash = ? AND scraped_at > ?
+            """,
+                (url_hash, cutoff_time),
+            )
+
+            result = cursor.fetchone()
+            if result:
+                self.logger.debug(
+                    f"URL recently scraped (at {result[0]}), skipping: {url}"
+                )
+                return True
+
+        return False
+
+    def _store_scraped_article(
+        self,
+        url: str,
+        headline: Optional[str] = None,
+        content: Optional[str] = None,
+        success: bool = True,
+    ) -> None:
+        """Store scraped article in database.
+
+        Args:
+            url: Article URL
+            headline: Article headline if extracted
+            content: Article content if extracted
+            success: Whether scraping was successful
+        """
+        normalized_url = self._normalize_url(url)
+        url_hash = self._hash_string(normalized_url)
+
+        content_hash = None
+        if content:
+            content_hash = self._hash_string(content[:500].lower().strip())
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            # Use INSERT OR REPLACE to update if URL already exists
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO scraped_articles
+                (url, url_hash, normalized_url, headline, content_hash, scraped_at, scrape_success)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    url,
+                    url_hash,
+                    normalized_url,
+                    headline,
+                    content_hash,
+                    datetime.now().isoformat(),
+                    success,
+                ),
+            )
+
+            conn.commit()
+            self.logger.debug(f"Stored scraped article: {url[:100]}")
+
+    def cleanup_old_scraped_records(self, days_to_keep: int = 7) -> int:
+        """Clean up old scraped article records from database.
+
+        Args:
+            days_to_keep: Number of days to keep records
+
+        Returns:
+            Number of records deleted
+        """
+        cutoff_date = (datetime.now() - timedelta(days=days_to_keep)).isoformat()
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM scraped_articles WHERE scraped_at < ?", (cutoff_date,)
+            )
+
+            deleted_count = cursor.rowcount
+            conn.commit()
+
+        self.logger.info(f"Cleaned up {deleted_count} old scraped article records")
+        return deleted_count

@@ -16,6 +16,8 @@ class NewsConfig(TypedDict):
     max_articles: int
     system_prompt: str
     news_sites: list[str]
+    skip_recently_scraped: bool
+    scraping_cache_hours: int
 
 
 class RedditConfig(TypedDict):
@@ -120,6 +122,8 @@ DEFAULT_CONFIG: Final[ConfigDict] = {
             "https://www.news5cleveland.com/news/local-news/oh-summit/",
             "https://www.wkyc.com/section/summit-county",
         ],
+        "skip_recently_scraped": True,
+        "scraping_cache_hours": 24,
     },
     "reddit": {
         "subreddit": "news",
@@ -213,8 +217,18 @@ class Config:
 
     @cached_property
     def database_path(self) -> str:
-        """Database path for submission tracking."""
+        """Get database path."""
         return str(self._data.get("database", {}).get("path", "data/submissions.db"))
+
+    @cached_property
+    def skip_recently_scraped(self) -> bool:
+        """Whether to skip recently scraped URLs."""
+        return bool(self._data.get("news", {}).get("skip_recently_scraped", True))
+
+    @cached_property
+    def scraping_cache_hours(self) -> int:
+        """Number of hours to cache scraped URLs."""
+        return int(self._data.get("news", {}).get("scraping_cache_hours", 24))
 
     @cached_property
     def news_sites(self) -> list[str]:

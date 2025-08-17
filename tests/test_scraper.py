@@ -1,16 +1,22 @@
 """Tests for the website scraper module."""
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.scraper import WebsiteScraper
 
 
 @pytest.fixture
-def config():
+def config(tmp_path: Path):
     """Create a test configuration."""
-    return Config()
+    config = MagicMock(spec=Config)
+    config.database_path = str(tmp_path / "test.db")
+    config.skip_recently_scraped = True
+    config.scraping_cache_hours = 24
+    config.news_sites = ["https://example.com"]
+    return config
 
 
 @pytest.fixture
@@ -93,7 +99,8 @@ class TestWebsiteScraper:
 
         scraper.browser = mock_browser
 
-        url, html = await scraper.fetch_website("https://example.com")
+        # Force fetch to bypass cache
+        url, html = await scraper.fetch_website("https://example.com", force=True)
 
         assert url == "https://example.com"
         assert html == "<html>Test HTML</html>"

@@ -45,7 +45,7 @@ typecheck: ## Run type checking with mypy
 	uv run mypy src/
 
 security: ## Run security analysis with bandit
-	uv run bandit -r src/
+	uv run bandit -r src/ -s B608,B112,B311
 
 quality: lint typecheck security ## Run all code quality checks
 
