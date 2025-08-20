@@ -6,7 +6,7 @@ import re
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Final, Optional, Tuple, TypedDict
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -18,6 +18,14 @@ from hudson_news_bot.config.settings import Config
 from hudson_news_bot.utils.logging import get_logger
 
 
+class NewsItemDict(TypedDict):
+    url: str
+    headline: str | None
+    date: str | None
+    content: str | None
+    summary: str | None
+
+
 class WebsiteScraper:
     """Downloads and extracts content from news websites using Playwright."""
 
@@ -27,19 +35,19 @@ class WebsiteScraper:
         Args:
             config: Configuration instance
         """
-        self.config = config
-        self.logger = get_logger("news.scraper")
+        self.config: Final = config
+        self.logger: Final = get_logger("news.scraper")
         self.browser: Browser | None = None
         self.playwright: Playwright | None = None
 
         # Set up database for tracking scraped URLs
-        self.db_path = Path(config.database_path)
+        self.db_path: Final = Path(config.database_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_database()
 
         # Cache configuration
-        self.skip_recently_scraped = config.skip_recently_scraped
-        self.scraping_cache_hours = config.scraping_cache_hours
+        self.skip_recently_scraped: Final = config.skip_recently_scraped
+        self.scraping_cache_hours: Final = config.scraping_cache_hours
 
     def _init_database(self) -> None:
         """Initialize SQLite database for tracking scraped articles."""
@@ -92,12 +100,15 @@ class WebsiteScraper:
         if self.playwright:
             await self.playwright.stop()
 
-    async def fetch_website(self, url: str, force: bool = False) -> Tuple[str, str]:
+    async def fetch_website(
+        self, url: str, force: bool = False, retry_count: int = 0
+    ) -> tuple[str, str]:
         """Fetch HTML content from a website using Playwright.
 
         Args:
             url: Website URL to fetch
             force: Force fetching even if recently scraped
+            retry_count: Current retry attempt number
 
         Returns:
             Tuple of (url, html_content)
@@ -105,52 +116,83 @@ class WebsiteScraper:
         if not self.browser:
             raise RuntimeError("Browser not initialized. Use async context manager.")
 
-        # Check if URL was recently scraped (unless force=True)
-        if not force and self._check_if_recently_scraped(url):
+        # Check if this is a main news site URL (should never be cached)
+        is_news_site = self._is_news_site_url(url)
+
+        # Check if URL was recently scraped (unless force=True or it's a news site)
+        if not force and not is_news_site and self._check_if_recently_scraped(url):
             self.logger.info(f"Skipping recently scraped URL: {url}")
             return url, ""
 
         page = None
         try:
-            self.logger.debug(f"Fetching {url} with Playwright")
+            self.logger.debug(
+                f"Fetching {url} with Playwright (attempt {retry_count + 1})"
+            )
             page = await self.browser.new_page()
 
             # Set a reasonable viewport and user agent
             await page.set_viewport_size({"width": 1280, "height": 720})
             await page.set_extra_http_headers(
                 {
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
                 }
             )
 
-            # Navigate to the page with timeout
-            await page.goto(url, wait_until="networkidle", timeout=30000)
+            # Navigate to the page with increased timeout and less strict wait condition
+            # Using domcontentloaded instead of networkidle for faster loading
+            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
-            # Wait a bit for any lazy-loaded content
-            await page.wait_for_timeout(2000)
+            # Wait for essential content to appear instead of fixed timeout
+            try:
+                # Wait for common article/content selectors
+                await page.wait_for_selector(
+                    "article, main, .article-content, .story-content, h1", timeout=5000
+                )
+            except PlaywrightTimeout:
+                # If no content found, still continue
+                self.logger.debug(
+                    f"No content selector found for {url}, continuing anyway"
+                )
 
             # Get the page content
             html = await page.content()
             self.logger.info(f"Successfully fetched {url} ({len(html)} bytes)")
 
-            # Store successful fetch (will be updated with content later)
-            self._store_scraped_article(url, success=True)
+            # Store successful fetch only for article URLs, not news sites
+            if not is_news_site:
+                self._store_scraped_article(url, success=True)
 
             return url, html
 
         except PlaywrightTimeout:
-            self.logger.error(f"Timeout fetching {url}")
-            self._store_scraped_article(url, success=False)
+            # Retry for news sites (not article pages) up to 2 times
+            if is_news_site and retry_count < 2:
+                self.logger.warning(
+                    f"Timeout fetching {url}, retrying... (attempt {retry_count + 2}/3)"
+                )
+                if page:
+                    await page.close()
+                # Wait a bit before retry
+                await asyncio.sleep(2)
+                return await self.fetch_website(url, force, retry_count + 1)
+
+            self.logger.error(
+                f"Timeout fetching {url} after {retry_count + 1} attempts"
+            )
+            if not is_news_site:
+                self._store_scraped_article(url, success=False)
             return url, ""
         except Exception as e:
             self.logger.error(f"Failed to fetch {url}: {e}")
-            self._store_scraped_article(url, success=False)
+            if not is_news_site:
+                self._store_scraped_article(url, success=False)
             return url, ""
         finally:
             if page:
                 await page.close()
 
-    async def fetch_all_websites(self, urls: List[str]) -> Dict[str, str]:
+    async def fetch_all_websites(self, urls: list[str]) -> dict[str, str]:
         """Fetch HTML content from multiple websites concurrently.
 
         Args:
@@ -159,18 +201,29 @@ class WebsiteScraper:
         Returns:
             Dictionary mapping URL to HTML content
         """
-        # Fetch pages with some concurrency limit to avoid overwhelming the browser
-        semaphore = asyncio.Semaphore(3)  # Limit to 3 concurrent pages
+        # Reduce concurrency for stability with slow sites
+        semaphore = asyncio.Semaphore(2)  # Limit to 2 concurrent pages
 
         async def fetch_with_limit(url: str) -> Tuple[str, str]:
             async with semaphore:
                 return await self.fetch_website(url)
 
         tasks = [fetch_with_limit(url) for url in urls]
-        results = await asyncio.gather(*tasks)
-        return dict(results)
+        # Use return_exceptions=True to prevent one failure from canceling others
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    def extract_article_links(self, html: str, base_url: str) -> List[str]:
+        # Process results, handling any exceptions
+        processed_results: list[tuple[str, str]] = []
+        for i, result in enumerate(results):
+            if isinstance(result, BaseException):
+                self.logger.error(f"Error fetching {urls[i]}: {result}")
+                processed_results.append((urls[i], ""))
+            else:
+                processed_results.append(result)
+
+        return dict(processed_results)
+
+    def extract_article_links(self, html: str, base_url: str) -> list[str]:
         """Extract article links from HTML content.
 
         Args:
@@ -190,12 +243,15 @@ class WebsiteScraper:
         article_patterns = [
             r"/\d{4}/\d{2}/\d{2}/",  # Date-based URLs (strict format)
             r"/article/",
+            r"/local-news/",
+            r"/news/",
             r"/story/",
             r"/posts/\d+",  # Post with ID
         ]
 
         # Patterns to exclude (category/tag pages)
         exclude_patterns = [
+            r"/news/national/",
             r"/category/",
             r"/tag/",
             r"/page/\d+",
@@ -219,7 +275,7 @@ class WebsiteScraper:
 
         return list(links)
 
-    def extract_article_content(self, html: str, url: str) -> Dict[str, Optional[str]]:
+    def extract_article_content(self, html: str, url: str) -> NewsItemDict:
         """Extract article content and metadata from HTML.
 
         Args:
@@ -230,16 +286,14 @@ class WebsiteScraper:
             Dictionary with headline, summary, date, and content
         """
         if not html:
-            return {"headline": None, "summary": None, "date": None, "content": None}
+            return NewsItemDict(
+                url=url, headline=None, date=None, content=None, summary=None
+            )
 
         soup = BeautifulSoup(html, "html.parser")
-        result = {
-            "url": url,
-            "headline": None,
-            "summary": None,
-            "date": None,
-            "content": None,
-        }
+        result = NewsItemDict(
+            url=url, headline=None, date=None, content=None, summary=None
+        )
 
         # Extract headline - try multiple selectors
         headline_selectors = [
@@ -345,7 +399,7 @@ class WebsiteScraper:
 
         return result
 
-    async def scrape_news_sites(self, sites: list[str]) -> list[dict[str, str | None]]:
+    async def scrape_news_sites(self, sites: list[str]) -> list[NewsItemDict]:
         """Scrape multiple news sites and extract articles with deduplication.
 
         Args:
@@ -393,7 +447,7 @@ class WebsiteScraper:
             )
 
             # Fetch all unique article pages that haven't been scraped recently
-            all_articles: list[dict[str, str | None]] = []
+            all_articles: list[NewsItemDict] = []
             seen_headlines: set[str] = set()
             seen_content_hashes: set[int] = set()
 
@@ -459,6 +513,24 @@ class WebsiteScraper:
 
             return all_articles
 
+    def _is_news_site_url(self, url: str) -> bool:
+        """Check if a URL is a main news site URL (not an article).
+
+        Args:
+            url: URL to check
+
+        Returns:
+            True if URL is a configured news site
+        """
+        # Normalize both URLs for comparison
+        normalized_url = self._normalize_url(url)
+
+        # Check against configured news sites
+        return any(
+            self._normalize_url(news_site) == normalized_url
+            for news_site in self.config.news_sites
+        )
+
     def _normalize_url(self, url: str) -> str:
         """Normalize URL for deduplication by removing common variations.
 
@@ -469,27 +541,37 @@ class WebsiteScraper:
             Normalized URL string
         """
         # Remove trailing slashes
-        url = url.rstrip("/")
+        url = url.rstrip("/").lower()
+
+        # Remove fragment identifiers (do this early to avoid unnecessary processing)
+        fragment_pos = url.find("#")
+        if fragment_pos != -1:
+            url = url[:fragment_pos]
 
         # Remove common tracking parameters
-        if "?" in url:
-            base_url, params = url.split("?", 1)
-            # Keep only essential parameters (you might want to customize this)
-            essential_params: list[str] = []
-            for param in params.split("&"):
-                if not any(
-                    tracking in param.lower()
-                    for tracking in ["utm_", "fbclid", "gclid", "ref=", "source="]
-                ):
-                    essential_params.append(param)
+        query_pos = url.find("?")
+        if query_pos != -1:
+            base_url = url[:query_pos]
+            params = url[query_pos + 1 :].lower()
+
+            # Use a list comprehension for filtering parameters
+            tracking_prefixes = {"utm_", "fbclid", "gclid"}
+            tracking_substrings = {"ref=", "source="}
+
+            essential_params = [
+                param
+                for param in params.split("&")
+                if not (
+                    any(param.startswith(prefix) for prefix in tracking_prefixes)
+                    or any(substring in param for substring in tracking_substrings)
+                )
+            ]
+
+            # Reconstruct the URL
             if essential_params:
                 url = f"{base_url}?{'&'.join(essential_params)}"
             else:
                 url = base_url
-
-        # Remove fragment identifiers
-        if "#" in url:
-            url = url.split("#")[0]
 
         # Convert to lowercase for comparison
         return url.lower()

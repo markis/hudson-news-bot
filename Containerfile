@@ -5,12 +5,19 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
   PYTHONUNBUFFERED=1 \
   UV_CACHE_DIR=/tmp/uv-cache
 
-# Install system dependencies
+# Install system dependencies including cron
 RUN apt-get update && apt-get install -y \
   curl \
   nodejs \
   npm \
+  cron \
   && rm -rf /var/lib/apt/lists/*
+
+# Note: Authentication will be handled at runtime:
+# - For Pro/Max users: claude login (preferred)
+# - For API users: ANTHROPIC_API_KEY environment variable
+# Install Claude Code SDK CLI (required dependency)
+RUN npm install -g @anthropic-ai/claude-code
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
@@ -21,38 +28,67 @@ WORKDIR /app
 # Copy dependency files
 COPY pyproject.toml uv.lock ./
 
-# Install Python dependencies globally
-RUN uv sync --frozen --no-dev
-
-# Install Claude Code SDK CLI (required dependency)
-RUN npm install -g @anthropic-ai/claude-code
-RUN npm install -g @playwright/mcp@latest
-
-# Install playwright and its dependencies
-RUN pip install playwright
-RUN playwright install --with-deps --only-shell chromium
-
-# Note: Authentication will be handled at runtime:
-# - For Pro/Max users: claude login (preferred)
-# - For API users: ANTHROPIC_API_KEY environment variable
-
-# Copy application code
+# Copy application code first
 COPY src/ src/
 COPY config/ config/
 
-# Install the project globally
+# Install the project and its dependencies globally using system Python
 RUN uv pip install --system -e .
 
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash app \
-  && chown -R app:app /app
-USER app
+# Install shell only chromium for Playwright
+RUN playwright install --with-deps --only-shell chromium
 
-RUN claude mcp add playwright mcp-server-playwright -- "--config=/app/config/playwright.json --browser=chromium --executable-path=/opt/microsoft/playwright/chromium-*/chrome-linux/chrome --headless"
+# Create cron job script
+RUN echo '#!/bin/bash\n\
+  export PYTHONDONTWRITEBYTECODE=1\n\
+  export PYTHONUNBUFFERED=1\n\
+  export UV_CACHE_DIR=/tmp/uv-cache\n\
+  # Source environment variables from /app/.env if it exists\n\
+  if [ -f /app/.env ]; then\n\
+  set -a\n\
+  source /app/.env\n\
+  set +a\n\
+  fi\n\
+  # Log start time\n\
+  echo "[$(date)] Starting Hudson News Bot run..." >> /var/log/hudson-news-bot.log\n\
+  # Run the bot\n\
+  /usr/local/bin/hudson-news-bot >> /var/log/hudson-news-bot.log 2>&1\n\
+  echo "[$(date)] Hudson News Bot run completed" >> /var/log/hudson-news-bot.log\n' > /usr/local/bin/run-hudson-bot.sh \
+  && chmod +x /usr/local/bin/run-hudson-bot.sh
 
-# Health check
+# Setup cron job (runs every 6 hours by default)
+# The cron schedule can be overridden at runtime
+RUN echo "# Hudson News Bot Cron Job\n\
+  # Default: Run every 6 hours at minute 0\n\
+  0 */6 * * * root /usr/local/bin/run-hudson-bot.sh\n\
+  # Also run on container startup\n\
+  @reboot root /usr/local/bin/run-hudson-bot.sh\n" > /etc/cron.d/hudson-news-bot \
+  && chmod 0644 /etc/cron.d/hudson-news-bot
+
+# Create log file and directory with proper permissions
+RUN mkdir -p /var/log \
+  && touch /var/log/hudson-news-bot.log \
+  && chmod 666 /var/log/hudson-news-bot.log
+
+# Health check - verify cron is running
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD uv run python -m hudson_news_bot.config.settings --validate || exit 1
+  CMD service cron status || exit 1
 
-# Default command
-CMD ["hudson-news-bot"]
+# Create entrypoint script to handle environment variables and start cron
+RUN echo '#!/bin/bash\n\
+  # If CRON_SCHEDULE is set, update the cron job\n\
+  if [ ! -z "$CRON_SCHEDULE" ]; then\n\
+  echo "# Hudson News Bot Cron Job (Custom Schedule)" > /etc/cron.d/hudson-news-bot\n\
+  echo "$CRON_SCHEDULE root /usr/local/bin/run-hudson-bot.sh" >> /etc/cron.d/hudson-news-bot\n\
+  echo "@reboot root /usr/local/bin/run-hudson-bot.sh" >> /etc/cron.d/hudson-news-bot\n\
+  fi\n\
+  # Start cron service\n\
+  service cron start\n\
+  # Run once on startup\n\
+  /usr/local/bin/run-hudson-bot.sh\n\
+  # Tail the log file to keep container running\n\
+  tail -f /var/log/hudson-news-bot.log\n' > /entrypoint.sh \
+  && chmod +x /entrypoint.sh
+
+# Default command - run the entrypoint script
+CMD ["/entrypoint.sh"]

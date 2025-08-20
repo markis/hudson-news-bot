@@ -12,7 +12,7 @@ news_sites = [
   "https://www.wkyc.com/section/summit-county",
 ]
 # Skip URLs that were scraped within this many hours (default 24)
-scraping_cache_hours = 24
+scraping_cache_hours = 2160  # 90 days
 # Whether to skip recently scraped URLs (default true)
 skip_recently_scraped = true
 

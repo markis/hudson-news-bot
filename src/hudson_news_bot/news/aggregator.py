@@ -5,7 +5,7 @@ import datetime
 from logging import Logger
 import re
 import sys
-from typing import Final, List, Optional
+from typing import Final, Optional
 
 from claude_code_sdk import (
     AssistantMessage,
@@ -16,7 +16,7 @@ from claude_code_sdk import (
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsCollection
-from hudson_news_bot.news.scraper import WebsiteScraper
+from hudson_news_bot.news.scraper import NewsItemDict, WebsiteScraper
 from hudson_news_bot.utils.logging import get_logger
 from hudson_news_bot.utils.toml_handler import TOMLHandler
 
@@ -113,7 +113,7 @@ class NewsAggregator:
 
         raise Exception("No response received from Claude")
 
-    def create_analysis_prompt(self, articles: List[dict[str, Optional[str]]]) -> str:
+    def create_analysis_prompt(self, articles: list[NewsItemDict]) -> str:
         """Create the prompt for Claude to analyze scraped articles.
 
         Args:
@@ -125,7 +125,7 @@ class NewsAggregator:
         today = datetime.datetime.now().strftime("%Y-%m-%d")
 
         # Prepare article summaries for Claude
-        article_summaries = []
+        article_summaries: list[str] = []
         for i, article in enumerate(articles[:20], 1):  # Limit to first 20 articles
             summary = f"""
 Article {i}:
@@ -161,7 +161,10 @@ IMPORTANT:
 - Prioritize the most recent articles (from today or yesterday)
 - Ensure dates are in YYYY-MM-DD format
 - Write clear, concise summaries that capture the key points
-- Output ONLY the TOML data, no explanatory text"""
+- Output ONLY the TOML data, no explanatory text
+- If no relevant articles are found, return an empty TOML array like this:
+[[news]]
+"""
 
         return prompt
 

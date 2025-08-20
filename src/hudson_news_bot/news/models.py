@@ -1,8 +1,9 @@
 """Core data models for news aggregation."""
 
-from dataclasses import dataclass, field
+from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterator
+from typing import Final, Iterator
 
 import tomli_w
 
@@ -26,15 +27,14 @@ class NewsItem:
         }
 
 
-def default_news_list() -> "list[NewsItem]":
-    return list()
-
-
 @dataclass
 class NewsCollection:
     """Collection of news items with TOML serialization support."""
 
-    news: list[NewsItem] = field(default_factory=default_news_list)
+    news: Final[list[NewsItem]]
+
+    def __init__(self, news: Iterable[NewsItem] | None = None) -> None:
+        self.news = list(news) if news is not None else []
 
     def to_toml_string(self) -> str:
         """Convert collection to TOML string format."""

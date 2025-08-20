@@ -1,0 +1,60 @@
+version: "3.8"
+
+services:
+  hudson-news-bot-cron:
+    build:
+      context: .
+      dockerfile: Containerfile
+    container_name: hudson-news-bot-cron
+    environment:
+      # Reddit API credentials
+      - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID}
+      - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET}
+      - REDDIT_USER_AGENT=${REDDIT_USER_AGENT:-HudsonNewsBot/1.0}
+
+      # Claude authentication (choose one):
+      # Option 1: API Key
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Option 2: Use claude login (preferred for Pro/Max users)
+
+      # Cron schedule (default: every 6 hours)
+      # Format: minute hour day month day-of-week
+      # Examples:
+      #   "0 */6 * * *"    - Every 6 hours (default)
+      #   "0 8,14,20 * * *" - At 8am, 2pm, and 8pm daily
+      #   "*/30 * * * *"    - Every 30 minutes
+      #   "0 9 * * 1-5"     - 9am on weekdays only
+      - CRON_SCHEDULE=${CRON_SCHEDULE:-0 */6 * * *}
+
+      # Optional: Subreddit to post to
+      - SUBREDDIT=${SUBREDDIT:-test}
+
+      # Optional: Dry run mode (set to 'true' to test without posting)
+      - DRY_RUN=${DRY_RUN:-false}
+
+    volumes:
+      # Mount config file if you have custom settings
+      - ./config/config.toml:/app/config/config.toml:ro
+
+      # Persist logs
+      - ./logs:/var/log
+
+      # Optional: Mount .env file for additional config
+      - ./.env:/app/.env:ro
+
+    restart: unless-stopped
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+networks:
+  default:
+    name: hudson-news-bot-network
+

@@ -13,9 +13,8 @@ services:
       - ./logs:/app/logs
       # Mount config directory for custom configurations
       - ./config:/app/config:ro
-      # Mount Claude CLI config for authentication persistence
-      - ./config/claude/:/home/app/.claude
-      - ./config/mcp.json:/app/.mcp.json
+      # Mount database
+      - ./data/:/app/data
     restart: unless-stopped
     command:
       sleep infinity
@@ -27,5 +26,8 @@ services:
       #   "hudson_news_bot.main",
       #   "--log-level",
       #   "DEBUG",
-      #   "--dry-run",
       # ]
+
+networks:
+  default:
+    name: hudson-news-bot-network

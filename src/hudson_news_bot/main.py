@@ -94,12 +94,28 @@ class NewsBot:
                 self.logger.info(f"Saving news items to {output_file}")
                 TOMLHandler.write_news_toml(news_collection, output_file)
 
-            # Step 3.5: Filter by date (only keep today and yesterday)
-            self.logger.info("Filtering news items by date...")
-            date_filtered_items = self._filter_by_date(news_collection)
+            # Step 3.1: Filter invalid items
+            self.logger.info("Filtering invalid news items...")
+            valid_items = self._filter_invalid(news_collection)
 
-            if len(date_filtered_items) < len(news_collection):
-                filtered_count = len(news_collection) - len(date_filtered_items)
+            if len(valid_items) < len(news_collection):
+                filtered_count = len(news_collection) - len(valid_items)
+                self.logger.info(
+                    f"Filtered out {filtered_count} invalid items (missing headline or link)"
+                )
+
+            if not valid_items:
+                self.logger.info(
+                    "No valid news items found (all items are missing headline or link)"
+                )
+                return True
+
+            # Step 3.2: Filter by date (only keep today and yesterday)
+            self.logger.info("Filtering news items by date...")
+            date_filtered_items = self._filter_by_date(valid_items)
+
+            if len(date_filtered_items) < len(valid_items):
+                filtered_count = len(valid_items) - len(date_filtered_items)
                 self.logger.info(
                     f"Filtered out {filtered_count} items older than yesterday"
                 )
@@ -177,6 +193,21 @@ class NewsBot:
 
         return unique_items
 
+    def _filter_invalid(self, news_collection: NewsCollection) -> NewsCollection:
+        """Filter out news items that are missing essential fields.
+
+        Args:
+            news_collection: Collection of news items to filter
+
+        Returns:
+            NewsCollection with only valid items (those with headline and link)
+        """
+        return NewsCollection(
+            news_item
+            for news_item in news_collection
+            if news_item.headline and news_item.link
+        )
+
     def _filter_by_date(self, news_collection: NewsCollection) -> NewsCollection:
         """Filter news items to only include those from today and yesterday.
 
@@ -187,21 +218,11 @@ class NewsBot:
             NewsCollection with items from today and yesterday only
         """
         yesterday = (datetime.now() - timedelta(days=1)).date()
-
-        filtered_collection = NewsCollection()
-
-        for news_item in news_collection:
-            # Extract date from publication_date (it's a datetime object)
-            item_date = news_item.publication_date.date()
-
-            if item_date >= yesterday:  # Include today and yesterday
-                filtered_collection.add_item(news_item)
-            else:
-                self.logger.debug(
-                    f"Filtering out old item: {news_item.headline} (published: {item_date})"
-                )
-
-        return filtered_collection
+        return NewsCollection(
+            news_item
+            for news_item in news_collection
+            if news_item.publication_date.date() >= yesterday
+        )
 
     def get_statistics(self) -> dict[str, Any]:
         """Get bot statistics.
@@ -320,4 +341,4 @@ def sync_main() -> None:
 
 
 if __name__ == "__main__":
-    sync_main()
+    asyncio.run(main())
