@@ -2,6 +2,7 @@
 
 import asyncio
 import hashlib
+import logging
 import re
 import sqlite3
 from datetime import datetime, timedelta
@@ -15,7 +16,6 @@ from playwright.async_api import async_playwright, Browser, Playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from hudson_news_bot.config.settings import Config
-from hudson_news_bot.utils.logging import get_logger
 
 
 class NewsItemDict(TypedDict):
@@ -36,7 +36,7 @@ class WebsiteScraper:
             config: Configuration instance
         """
         self.config: Final = config
-        self.logger: Final = get_logger("news.scraper")
+        self.logger: Final = logging.getLogger(__name__)
         self.browser: Browser | None = None
         self.playwright: Playwright | None = None
 

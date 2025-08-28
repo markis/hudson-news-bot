@@ -3,6 +3,7 @@
 import asyncio
 import datetime
 from logging import Logger
+import logging
 import re
 import sys
 from typing import Final, Optional
@@ -17,17 +18,7 @@ from claude_code_sdk import (
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsCollection
 from hudson_news_bot.news.scraper import NewsItemDict, WebsiteScraper
-from hudson_news_bot.utils.logging import get_logger
 from hudson_news_bot.utils.toml_handler import TOMLHandler
-
-SYSTEM_PROMPT: Final = """You are a news article analyzer. Your task is to:
-1. Review the scraped article content provided
-2. Identify the newest/most recent articles
-3. Extract key information from each article
-4. Format the output as valid TOML
-
-Focus on finding local Hudson, Ohio news articles from the last 24-48 hours.
-Prioritize articles with clear dates and local relevance."""
 
 
 class NewsAggregator:
@@ -44,19 +35,14 @@ class NewsAggregator:
             config: Configuration instance
         """
         self.config = config
-        self.logger = get_logger("news.aggregator")
+        self.logger = logging.getLogger(__name__)
 
         # Configure Claude SDK options for analyzing scraped content
         self.options = ClaudeCodeOptions(
             system_prompt=config.system_prompt,
             max_turns=config.claude_max_turns,
-            permission_mode="default",
-            disallowed_tools=["WebFetch", "WebSearch"],
-            allowed_tools=[
-                "Task",
-                "mcp__playwright__browser_navigate",
-                "mcp__playwright__browser_click",
-            ],
+            permission_mode=config.claude_permission_mode,
+            model=config.claude_model,
         )
 
     async def aggregate_news(self) -> NewsCollection:
@@ -235,7 +221,7 @@ async def test_connection() -> bool:
     Returns:
         True if connection successful, False otherwise
     """
-    logger = get_logger("news.aggregator.test")
+    logger = logging.getLogger(__name__)
 
     try:
         config = Config()

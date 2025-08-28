@@ -5,7 +5,9 @@ import os
 import sys
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Final, TypedDict, cast
+from typing import Any, Final, NotRequired, TypedDict, cast
+
+from claude_code_sdk import PermissionMode
 
 from hudson_news_bot.utils.toml_handler import TOMLHandler
 
@@ -35,6 +37,7 @@ class ClaudeConfig(TypedDict):
     max_turns: int
     permission_mode: str
     timeout_seconds: int
+    model: NotRequired[str]
 
 
 class DatabaseConfig(TypedDict):
@@ -110,7 +113,7 @@ DEFAULT_CONFIG: Final[ConfigDict] = {
     },
     "claude": {
         "max_turns": 3,
-        "permission_mode": "readOnly",
+        "permission_mode": "plan",
         "timeout_seconds": 300,
     },
     "database": {"path": "data/submissions.db"},
@@ -183,9 +186,17 @@ class Config:
         return int(self._data.get("claude", {}).get("max_turns", 3))
 
     @cached_property
-    def claude_permission_mode(self) -> str:
+    def claude_model(self) -> str | None:
+        """Maximum turns for Claude conversation."""
+        return self._data.get("claude", {}).get("model")
+
+    @cached_property
+    def claude_permission_mode(self) -> PermissionMode:
         """Claude permission mode."""
-        return str(self._data.get("claude", {}).get("permission_mode", "readOnly"))
+        return cast(
+            PermissionMode,
+            self._data.get("claude", {}).get("permission_mode", "plan"),
+        )
 
     @cached_property
     def claude_timeout_seconds(self) -> int:

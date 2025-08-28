@@ -17,16 +17,8 @@ services:
       - ./data/:/app/data
     restart: unless-stopped
     command:
-      sleep infinity
-      # [
-      #   "uv",
-      #   "run",
-      #   "python",
-      #   "-m",
-      #   "hudson_news_bot.main",
-      #   "--log-level",
-      #   "DEBUG",
-      # ]
+      # sleep infinity
+      ["hudson-news-bot", "--log-level", "DEBUG"]
 
 networks:
   default:

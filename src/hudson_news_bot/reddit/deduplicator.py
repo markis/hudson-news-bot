@@ -1,6 +1,7 @@
 """Duplicate detection system for Reddit submissions."""
 
 import hashlib
+import logging
 import sqlite3
 import urllib.parse
 from datetime import datetime, timedelta
@@ -11,7 +12,6 @@ from typing import Any
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsItem
 from hudson_news_bot.reddit.client import RedditClient
-from hudson_news_bot.utils.logging import get_logger
 
 
 class DuplicationChecker:
@@ -26,7 +26,7 @@ class DuplicationChecker:
         """
         self.reddit_client = reddit_client
         self.config = config
-        self.logger = get_logger("reddit.deduplicator")
+        self.logger = logging.getLogger(__name__)
 
         # Set up database
         self.db_path = Path(config.database_path)

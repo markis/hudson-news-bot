@@ -1,7 +1,14 @@
 [news]
 max_articles = 5
 # This system prompt is now used internally by the NewsAggregator
-system_prompt = """You are a news article analyzer that reviews scraped content."""
+system_prompt = """You are a news article analyzer. Your task is to:
+1. Review the scraped article content provided
+2. Identify the newest/most recent articles
+3. Extract key information from each article
+4. Format the output as valid TOML
+
+Focus on finding local Hudson, Ohio news articles from the last 24-48 hours.
+Prioritize articles with clear dates and local relevance."""
 # News sites to scrape for Hudson, Ohio news
 news_sites = [
   "https://hudsonohiotoday.com/",
@@ -12,7 +19,7 @@ news_sites = [
   "https://www.wkyc.com/section/summit-county",
 ]
 # Skip URLs that were scraped within this many hours (default 24)
-scraping_cache_hours = 2160  # 90 days
+scraping_cache_hours = 2160 # 90 days
 # Whether to skip recently scraped URLs (default true)
 skip_recently_scraped = true
 
@@ -24,8 +31,9 @@ max_search_results = 100
 
 [claude]
 max_turns = 10
-permission_mode = "readOnly"
+permission_mode = "plan"
 timeout_seconds = 300
+model = "claude-sonnet-4-20250514"
 
 [database]
 path = "data/submissions.db"

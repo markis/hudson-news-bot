@@ -10,7 +10,7 @@ def setup_logging(
     level: str = "INFO",
     log_file: Optional[str | Path] = None,
     format_string: Optional[str] = None,
-) -> logging.Logger:
+) -> None:
     """Set up logging configuration.
 
     Args:
@@ -58,24 +58,3 @@ def setup_logging(
 
     # Prevent duplicate logs
     logger.propagate = False
-
-    return logger
-
-
-def get_logger(name: str) -> logging.Logger:
-    """Get a logger instance for a specific module.
-
-    Args:
-        name: Logger name (typically __name__)
-
-    Returns:
-        Logger instance
-    """
-    return logging.getLogger(f"hudson_news_bot.{name}")
-
-
-# Module-level logger instances
-main_logger = get_logger("main")
-news_logger = get_logger("news")
-reddit_logger = get_logger("reddit")
-config_logger = get_logger("config")

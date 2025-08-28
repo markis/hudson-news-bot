@@ -2,6 +2,7 @@
 
 import asyncio
 from logging import Logger
+import logging
 import sys
 
 import asyncpraw  # type: ignore
@@ -10,7 +11,6 @@ from asyncpraw.models import Submission, Subreddit  # type: ignore
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsItem
-from hudson_news_bot.utils.logging import get_logger
 
 
 class RedditClient:
@@ -28,7 +28,7 @@ class RedditClient:
             config: Configuration instance
         """
         self.config = config
-        self.logger = get_logger("reddit.client")
+        self.logger = logging.getLogger(__name__)
 
     async def _get_reddit_instance(self) -> asyncpraw.Reddit:
         """Get or create Reddit instance.

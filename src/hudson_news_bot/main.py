@@ -1,6 +1,7 @@
 """Main application orchestrator for the news aggregation bot."""
 
 import asyncio
+import logging
 import sys
 from datetime import datetime, timedelta
 from typing import Any, List, Optional
@@ -10,7 +11,7 @@ from hudson_news_bot.news.aggregator import NewsAggregator
 from hudson_news_bot.news.models import NewsCollection, NewsItem
 from hudson_news_bot.reddit.client import RedditClient
 from hudson_news_bot.reddit.deduplicator import DuplicationChecker
-from hudson_news_bot.utils.logging import get_logger, setup_logging
+from hudson_news_bot.utils.logging import setup_logging
 from hudson_news_bot.utils.toml_handler import TOMLHandler
 
 
@@ -24,7 +25,7 @@ class NewsBot:
             config: Configuration instance
         """
         self.config = config
-        self.logger = get_logger("main")
+        self.logger = logging.getLogger(__name__)
 
         # Initialize components
         self.news_aggregator = NewsAggregator(config)
@@ -272,7 +273,7 @@ async def main() -> None:
     # Set up logging
     setup_logging(level=args.log_level, log_file=args.log_file)
 
-    logger = get_logger("main")
+    logger = logging.getLogger(__name__)
 
     bot: Optional[NewsBot] = None
 
@@ -319,8 +320,8 @@ async def main() -> None:
             success = await bot.run(dry_run=args.dry_run, output_file=args.output)
         finally:
             await bot.cleanup()
-
-        sys.exit(0 if success else 1)
+        if not success:
+            sys.exit(1)
 
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
