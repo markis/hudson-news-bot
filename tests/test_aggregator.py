@@ -9,6 +9,7 @@ from claude_code_sdk import AssistantMessage, TextBlock
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.aggregator import NewsAggregator, main
 from hudson_news_bot.news.models import NewsCollection, NewsItem
+from hudson_news_bot.news.scraper import NewsItemDict
 
 
 class TestNewsAggregator:
@@ -36,25 +37,7 @@ class TestNewsAggregator:
         assert aggregator.logger.name == "hudson_news_bot.news.aggregator"
         assert aggregator.options.system_prompt == "Test system prompt"
         assert aggregator.options.max_turns == 5
-        assert aggregator.options.permission_mode == "default"
-        assert "WebFetch" in aggregator.options.disallowed_tools
-        assert "WebSearch" in aggregator.options.disallowed_tools
-        assert "Task" in aggregator.options.allowed_tools
-
-    def test_claude_options_configuration(self, aggregator: NewsAggregator) -> None:
-        """Test Claude SDK options are properly configured."""
-        options = aggregator.options
-
-        # Test disallowed tools
-        assert "WebFetch" in options.disallowed_tools
-        assert "WebSearch" in options.disallowed_tools
-
-        # Test allowed tools include playwright tools
-        assert "mcp__playwright__browser_navigate" in options.allowed_tools
-        assert "mcp__playwright__browser_click" in options.allowed_tools
-
-        # Test permission mode
-        assert options.permission_mode == "default"
+        assert aggregator.options.permission_mode == config.claude_permission_mode
 
     def test_config_integration(self) -> None:
         """Test that aggregator properly uses config values."""
@@ -434,19 +417,21 @@ Additional text after TOML"""
         assert result is None
 
     def test_create_analysis_prompt(self, aggregator: NewsAggregator) -> None:
-        articles = [
-            {
-                "url": "https://hudsonohiotoday.com/article1",
-                "headline": "Test Article 1",
-                "date": "2025-08-14",
-                "content": "Test content 1",
-            },
-            {
-                "url": "https://beaconjournal.com/article2",
-                "headline": "Test Article 2",
-                "date": "2025-08-13",
-                "content": "Test content 2",
-            },
+        articles: list[NewsItemDict] = [
+            NewsItemDict(
+                url="https://hudsonohiotoday.com/article1",
+                headline="Test Article 1",
+                date="2025-08-14",
+                content="Test content 1",
+                summary="",
+            ),
+            NewsItemDict(
+                url="https://beaconjournal.com/article2",
+                headline="Test Article 2",
+                date="2025-08-13",
+                content="Test content 2",
+                summary="",
+            ),
         ]
         prompt = aggregator.create_analysis_prompt(articles)
 

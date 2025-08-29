@@ -124,7 +124,7 @@ class Config:
     """Configuration management using TOML files and environment variables."""
 
     _config_path: Final[Path]
-    _data: Final[dict[str, Any]]
+    _data: Final[ConfigDict]
 
     def __init__(
         self,
@@ -143,10 +143,11 @@ class Config:
         self._config_path = Path(config_path)
         self._data = self._get_config_data(self._config_path)
 
-    def _get_config_data(self, config_path: Path) -> dict[str, Any]:
+    def _get_config_data(self, config_path: Path) -> ConfigDict:
         """Load configuration data from the specified TOML file."""
         data = TOMLHandler.load_config(config_path)
-        return deep_merge_dicts(cast(dict[str, Any], DEFAULT_CONFIG), data)
+        merged_data = deep_merge_dicts(cast(dict[str, Any], DEFAULT_CONFIG), data)
+        return cast(ConfigDict, merged_data)
 
     @cached_property
     def subreddit_name(self) -> str:

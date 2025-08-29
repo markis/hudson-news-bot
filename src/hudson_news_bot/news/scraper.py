@@ -2,6 +2,7 @@
 
 import asyncio
 import hashlib
+import json
 import logging
 import re
 import sqlite3
@@ -12,7 +13,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag
-from playwright.async_api import async_playwright, Browser, Playwright
+from playwright.async_api import async_playwright, Browser, BrowserContext, Playwright
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from hudson_news_bot.config.settings import Config
@@ -39,11 +40,15 @@ class WebsiteScraper:
         self.logger: Final = logging.getLogger(__name__)
         self.browser: Browser | None = None
         self.playwright: Playwright | None = None
+        self.browser_context: BrowserContext | None = None
 
         # Set up database for tracking scraped URLs
         self.db_path: Final = Path(config.database_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_database()
+
+        # Cookie persistence setup
+        self.cookies_path: Final = self.db_path.parent / "playwright_cookies.json"
 
         # Cache configuration
         self.skip_recently_scraped: Final = config.skip_recently_scraped
@@ -89,11 +94,42 @@ class WebsiteScraper:
             self.browser = await self.playwright.chromium.launch(
                 headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"]
             )
+            
+            # Create a persistent browser context
+            self.browser_context = await self.browser.new_context()
+            
+            # Load saved cookies if they exist
+            if self.cookies_path.exists():
+                try:
+                    with open(self.cookies_path, 'r') as f:
+                        cookies = json.load(f)
+                    
+                    await self.browser_context.add_cookies(cookies)
+                    self.logger.info(f"Loaded {len(cookies)} cookies from previous session")
+                except Exception as e:
+                    self.logger.warning(f"Failed to load cookies: {e}")
+                    
         self.logger.info("Playwright browser launched")
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit - close browser."""
+        if self.browser_context:
+            # Save cookies before closing context
+            try:
+                cookies = await self.browser_context.cookies()
+                
+                # Save cookies to file if we have any
+                if cookies:
+                    with open(self.cookies_path, 'w') as f:
+                        json.dump(cookies, f, indent=2)
+                    self.logger.info(f"Saved {len(cookies)} cookies for next session")
+                    
+            except Exception as e:
+                self.logger.warning(f"Failed to save cookies: {e}")
+            
+            await self.browser_context.close()
+                
         if self.browser:
             await self.browser.close()
             self.logger.info("Browser closed")
@@ -113,8 +149,8 @@ class WebsiteScraper:
         Returns:
             Tuple of (url, html_content)
         """
-        if not self.browser:
-            raise RuntimeError("Browser not initialized. Use async context manager.")
+        if not self.browser_context:
+            raise RuntimeError("Browser context not initialized. Use async context manager.")
 
         # Check if this is a main news site URL (should never be cached)
         is_news_site = self._is_news_site_url(url)
@@ -129,7 +165,7 @@ class WebsiteScraper:
             self.logger.debug(
                 f"Fetching {url} with Playwright (attempt {retry_count + 1})"
             )
-            page = await self.browser.new_page()
+            page = await self.browser_context.new_page()
 
             # Set a reasonable viewport and user agent
             await page.set_viewport_size({"width": 1280, "height": 720})

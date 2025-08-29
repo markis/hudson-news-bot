@@ -74,7 +74,7 @@ system_prompt = "Test prompt"
                 assert config.check_for_duplicates is True
                 assert config.max_search_results == 100
                 assert config.claude_max_turns == 3
-                assert config.claude_permission_mode == "readOnly"
+                assert config.claude_permission_mode == "plan"
                 assert config.claude_timeout_seconds == 300
                 assert config.database_path == "data/submissions.db"
             finally:

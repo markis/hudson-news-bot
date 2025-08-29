@@ -190,30 +190,32 @@ class TestScraperCache:
         # Store as recently scraped
         scraper._store_scraped_article(url, "Cached", "Content", success=True)
 
-        # Mock browser for context manager
-        with patch.object(scraper, "browser", MagicMock()):
-            # Should return empty content due to cache
-            result_url, html = await scraper.fetch_website(url)
+        # Mock browser context
+        mock_context = AsyncMock()
+        scraper.browser_context = mock_context
+
+        # Should return empty content due to cache
+        result_url, html = await scraper.fetch_website(url)
+
+        assert result_url == url
+        assert html == ""  # Empty because it was skipped
+
+        # With force=True, should attempt to fetch
+        with patch.object(scraper, "browser_context") as mock_browser_context:
+            mock_page = AsyncMock()
+            mock_page.content = AsyncMock(return_value="<html>New content</html>")
+            mock_page.set_viewport_size = AsyncMock()
+            mock_page.set_extra_http_headers = AsyncMock()
+            mock_page.goto = AsyncMock()
+            mock_page.wait_for_timeout = AsyncMock()
+            mock_page.close = AsyncMock()
+            mock_browser_context.new_page = AsyncMock(return_value=mock_page)
+
+            result_url, html = await scraper.fetch_website(url, force=True)
 
             assert result_url == url
-            assert html == ""  # Empty because it was skipped
-
-            # With force=True, should attempt to fetch
-            with patch.object(scraper, "browser") as mock_browser:
-                mock_page = AsyncMock()
-                mock_page.content = AsyncMock(return_value="<html>New content</html>")
-                mock_page.set_viewport_size = AsyncMock()
-                mock_page.set_extra_http_headers = AsyncMock()
-                mock_page.goto = AsyncMock()
-                mock_page.wait_for_timeout = AsyncMock()
-                mock_page.close = AsyncMock()
-                mock_browser.new_page = AsyncMock(return_value=mock_page)
-
-                result_url, html = await scraper.fetch_website(url, force=True)
-
-                assert result_url == url
-                # Should have fetched new content
-                assert html == "<html>New content</html>"
+            # Should have fetched new content
+            assert html == "<html>New content</html>"
 
     def test_hash_string(self, scraper: WebsiteScraper) -> None:
         """Test string hashing."""

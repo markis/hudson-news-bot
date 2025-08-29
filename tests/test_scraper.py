@@ -94,10 +94,10 @@ class TestWebsiteScraper:
         mock_page.set_extra_http_headers.return_value = None
         mock_page.close.return_value = None
 
-        mock_browser = AsyncMock()
-        mock_browser.new_page.return_value = mock_page
+        mock_browser_context = AsyncMock()
+        mock_browser_context.new_page.return_value = mock_page
 
-        scraper.browser = mock_browser
+        scraper.browser_context = mock_browser_context
 
         # Force fetch to bypass cache
         url, html = await scraper.fetch_website("https://example.com", force=True)
@@ -108,10 +108,10 @@ class TestWebsiteScraper:
     @pytest.mark.asyncio
     async def test_fetch_website_failure(self, scraper):
         """Test website fetching with error."""
-        mock_browser = AsyncMock()
-        mock_browser.new_page.side_effect = Exception("Browser error")
+        mock_browser_context = AsyncMock()
+        mock_browser_context.new_page.side_effect = Exception("Browser error")
 
-        scraper.browser = mock_browser
+        scraper.browser_context = mock_browser_context
 
         url, html = await scraper.fetch_website("https://example.com")
 
