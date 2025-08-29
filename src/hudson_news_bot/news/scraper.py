@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 import re
 import sqlite3
 from datetime import datetime, timedelta
@@ -18,6 +19,18 @@ from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from hudson_news_bot.config.settings import Config
 
+USER_AGENT: Final = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
+
+
+def get_hudson_hub_times_email() -> str | None:
+    """Get Hudson Hub Times email from environment."""
+    return os.getenv("HUDSON_HUB_TIMES_EMAIL")
+
+
+def get_hudson_hub_times_password() -> str | None:
+    """Get Hudson Hub Times password from environment."""
+    return os.getenv("HUDSON_HUB_TIMES_PASSWORD")
+
 
 class NewsItemDict(TypedDict):
     url: str
@@ -28,10 +41,10 @@ class NewsItemDict(TypedDict):
 
 
 class WebsiteScraper:
-    """Downloads and extracts content from news websites using Playwright."""
+    """Downloads and extracts content from news websites using Playwright with cookies."""
 
-    def __init__(self, config: Config):
-        """Initialize the website scraper.
+    def __init__(self, config: Config) -> None:
+        """Initialize the enhanced website scraper.
 
         Args:
             config: Configuration instance
@@ -53,6 +66,10 @@ class WebsiteScraper:
         # Cache configuration
         self.skip_recently_scraped: Final = config.skip_recently_scraped
         self.scraping_cache_hours: Final = config.scraping_cache_hours
+
+        # Authentication credentials
+        self.hudson_hub_times_email = get_hudson_hub_times_email()
+        self.hudson_hub_times_password = get_hudson_hub_times_password()
 
     def _init_database(self) -> None:
         """Initialize SQLite database for tracking scraped articles."""
@@ -87,29 +104,131 @@ class WebsiteScraper:
             conn.commit()
             self.logger.debug("Scraping database initialized")
 
+    async def authenticate_hudson_hub_times(self) -> bool:
+        """Authenticate with Hudson Hub Times login.
+
+        Returns:
+            True if authentication successful, False otherwise
+        """
+        if not self.hudson_hub_times_email or not self.hudson_hub_times_password:
+            self.logger.warning(
+                "Hudson Hub Times credentials not configured, skipping authentication"
+            )
+            return False
+
+        if not self.browser_context:
+            raise RuntimeError("Browser context not initialized")
+
+        self.logger.info("Attempting to authenticate with Hudson Hub Times")
+
+        page = None
+        try:
+            page = await self.browser_context.new_page()
+
+            # Navigate to the login page
+            login_url = "https://login.beaconjournal.com/NABJ-GUP/authenticate/"
+            self.logger.debug(f"Navigating to login page: {login_url}")
+            await page.goto(login_url, wait_until="domcontentloaded", timeout=30000)
+
+            # Wait for the login form to load
+            await page.wait_for_selector("#login-form-email", timeout=10000)
+
+            # Fill in email
+            self.logger.debug("Filling email field")
+            await page.fill("#login-form-email", self.hudson_hub_times_email)
+
+            # Fill in password
+            self.logger.debug("Filling password field")
+            await page.fill("#login-form-password", self.hudson_hub_times_password)
+
+            # Wait for submit button to be enabled (JavaScript may disable it initially)
+            self.logger.debug("Waiting for submit button to be enabled")
+            submit_button_selector = 'button[type="submit"]:not([disabled])'
+            try:
+                await page.wait_for_selector(submit_button_selector, timeout=10000)
+                self.logger.debug("Submit button is now enabled")
+            except Exception as e:
+                self.logger.warning(
+                    f"Submit button may still be disabled, continuing anyway: {e}"
+                )
+
+            # Submit the form
+            self.logger.debug("Submitting login form")
+            await page.click('button[type="submit"]')
+
+            # Wait for navigation or success indicator
+            try:
+                # Wait for either successful redirect or error message
+                await page.wait_for_load_state("domcontentloaded", timeout=15000)
+
+                # Check if we're still on the login page (indicates failure)
+                current_url = page.url
+                if "authenticate" in current_url.lower():
+                    # Look for error messages
+                    error_selector = ".validation, .error, .alert"
+                    error_elements = await page.query_selector_all(error_selector)
+                    if error_elements:
+                        error_text = await error_elements[0].text_content()
+                        self.logger.error(f"Login failed: {error_text}")
+                        return False
+                    else:
+                        self.logger.warning(
+                            "Still on login page, authentication may have failed"
+                        )
+                        return False
+                else:
+                    self.logger.info(
+                        f"Successfully authenticated with Hudson Hub Times - redirected to: {current_url}"
+                    )
+                    return True
+
+            except PlaywrightTimeout:
+                self.logger.warning("Login process timed out, checking current page")
+                current_url = page.url
+                if "authenticate" not in current_url.lower():
+                    self.logger.info(
+                        "Authentication appears successful based on URL change"
+                    )
+                    return True
+                else:
+                    self.logger.error("Authentication failed - still on login page")
+                    return False
+
+        except Exception as e:
+            self.logger.error(f"Error during Hudson Hub Times authentication: {e}")
+            return False
+        finally:
+            if page:
+                await page.close()
+
     async def __aenter__(self) -> "WebsiteScraper":
-        """Async context manager entry - launch browser."""
+        """Async context manager entry - launch browser and authenticate."""
         self.playwright = await async_playwright().start()
         if self.playwright:
             self.browser = await self.playwright.chromium.launch(
                 headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"]
             )
-            
+
             # Create a persistent browser context
-            self.browser_context = await self.browser.new_context()
-            
+            self.browser_context = await self.browser.new_context(user_agent=USER_AGENT)
+
             # Load saved cookies if they exist
             if self.cookies_path.exists():
                 try:
-                    with open(self.cookies_path, 'r') as f:
+                    with open(self.cookies_path, "r") as f:
                         cookies = json.load(f)
-                    
+
                     await self.browser_context.add_cookies(cookies)
-                    self.logger.info(f"Loaded {len(cookies)} cookies from previous session")
+                    self.logger.info(
+                        f"Loaded {len(cookies)} cookies from previous session"
+                    )
                 except Exception as e:
                     self.logger.warning(f"Failed to load cookies: {e}")
-                    
-        self.logger.info("Playwright browser launched")
+
+            # Authenticate with Hudson Hub Times
+            await self.authenticate_hudson_hub_times()
+
+        self.logger.info("Playwright browser launched with cookies")
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -118,18 +237,18 @@ class WebsiteScraper:
             # Save cookies before closing context
             try:
                 cookies = await self.browser_context.cookies()
-                
+
                 # Save cookies to file if we have any
                 if cookies:
-                    with open(self.cookies_path, 'w') as f:
+                    with open(self.cookies_path, "w") as f:
                         json.dump(cookies, f, indent=2)
                     self.logger.info(f"Saved {len(cookies)} cookies for next session")
-                    
+
             except Exception as e:
                 self.logger.warning(f"Failed to save cookies: {e}")
-            
+
             await self.browser_context.close()
-                
+
         if self.browser:
             await self.browser.close()
             self.logger.info("Browser closed")
@@ -150,7 +269,9 @@ class WebsiteScraper:
             Tuple of (url, html_content)
         """
         if not self.browser_context:
-            raise RuntimeError("Browser context not initialized. Use async context manager.")
+            raise RuntimeError(
+                "Browser context not initialized. Use async context manager."
+            )
 
         # Check if this is a main news site URL (should never be cached)
         is_news_site = self._is_news_site_url(url)
@@ -169,24 +290,17 @@ class WebsiteScraper:
 
             # Set a reasonable viewport and user agent
             await page.set_viewport_size({"width": 1280, "height": 720})
-            await page.set_extra_http_headers(
-                {
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
-                }
-            )
+            await page.set_extra_http_headers({"User-Agent": USER_AGENT})
 
-            # Navigate to the page with increased timeout and less strict wait condition
-            # Using domcontentloaded instead of networkidle for faster loading
+            # Navigate to the page with increased timeout
             await page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
-            # Wait for essential content to appear instead of fixed timeout
+            # Wait for essential content to appear
             try:
-                # Wait for common article/content selectors
                 await page.wait_for_selector(
                     "article, main, .article-content, .story-content, h1", timeout=5000
                 )
             except PlaywrightTimeout:
-                # If no content found, still continue
                 self.logger.debug(
                     f"No content selector found for {url}, continuing anyway"
                 )
@@ -228,27 +342,18 @@ class WebsiteScraper:
             if page:
                 await page.close()
 
+    # Copy all the other methods from the original scraper
     async def fetch_all_websites(self, urls: list[str]) -> dict[str, str]:
-        """Fetch HTML content from multiple websites concurrently.
-
-        Args:
-            urls: List of website URLs to fetch
-
-        Returns:
-            Dictionary mapping URL to HTML content
-        """
-        # Reduce concurrency for stability with slow sites
-        semaphore = asyncio.Semaphore(2)  # Limit to 2 concurrent pages
+        """Fetch HTML content from multiple websites concurrently."""
+        semaphore = asyncio.Semaphore(2)
 
         async def fetch_with_limit(url: str) -> Tuple[str, str]:
             async with semaphore:
                 return await self.fetch_website(url)
 
         tasks = [fetch_with_limit(url) for url in urls]
-        # Use return_exceptions=True to prevent one failure from canceling others
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Process results, handling any exceptions
         processed_results: list[tuple[str, str]] = []
         for i, result in enumerate(results):
             if isinstance(result, BaseException):
@@ -260,32 +365,22 @@ class WebsiteScraper:
         return dict(processed_results)
 
     def extract_article_links(self, html: str, base_url: str) -> list[str]:
-        """Extract article links from HTML content.
-
-        Args:
-            html: HTML content
-            base_url: Base URL for resolving relative links
-
-        Returns:
-            List of absolute article URLs
-        """
+        """Extract article links from HTML content."""
         if not html:
             return []
 
         soup = BeautifulSoup(html, "html.parser")
         links: set[str] = set()
 
-        # Common patterns for article links
         article_patterns = [
-            r"/\d{4}/\d{2}/\d{2}/",  # Date-based URLs (strict format)
+            r"/\d{4}/\d{2}/\d{2}/",
             r"/article/",
             r"/local-news/",
             r"/news/",
             r"/story/",
-            r"/posts/\d+",  # Post with ID
+            r"/posts/\d+",
         ]
 
-        # Patterns to exclude (category/tag pages)
         exclude_patterns = [
             r"/news/national/",
             r"/category/",
@@ -299,7 +394,6 @@ class WebsiteScraper:
                 href = str(href).strip()
                 absolute_url = urljoin(base_url, href)
 
-                # Check if it looks like an article URL and not an excluded pattern
                 if any(
                     re.search(pattern, absolute_url.lower())
                     for pattern in article_patterns
@@ -312,15 +406,7 @@ class WebsiteScraper:
         return list(links)
 
     def extract_article_content(self, html: str, url: str) -> NewsItemDict:
-        """Extract article content and metadata from HTML.
-
-        Args:
-            html: HTML content
-            url: Article URL
-
-        Returns:
-            Dictionary with headline, summary, date, and content
-        """
+        """Extract article content and metadata from HTML."""
         if not html:
             return NewsItemDict(
                 url=url, headline=None, date=None, content=None, summary=None
@@ -383,7 +469,6 @@ class WebsiteScraper:
                                     str(date_str).replace("Z", "+00:00")
                                 ).strftime("%Y-%m-%d")
                             else:
-                                # Try to parse text date
                                 result["date"] = str(date_str).strip()
                             break
                         except Exception:
@@ -416,7 +501,6 @@ class WebsiteScraper:
         for selector in content_selectors:
             element = soup.select_one(selector)
             if element:
-                # Remove script and style tags
                 for script in element(["script", "style"]):
                     script.decompose()
 
@@ -426,7 +510,7 @@ class WebsiteScraper:
                         p.text.strip() for p in paragraphs[:10] if p.text.strip()
                     )
                     if content:
-                        result["content"] = content[:2000]  # Limit content length
+                        result["content"] = content[:2000]
                         if len(paragraphs) > 1:
                             result["summary"] = " ".join(
                                 p.text.strip() for p in paragraphs[:2] if p.text.strip()
@@ -436,16 +520,9 @@ class WebsiteScraper:
         return result
 
     async def scrape_news_sites(self, sites: list[str]) -> list[NewsItemDict]:
-        """Scrape multiple news sites and extract articles with deduplication.
-
-        Args:
-            sites: List of news site URLs
-
-        Returns:
-            List of unique article dictionaries
-        """
+        """Scrape multiple news sites and extract articles with deduplication."""
         async with self:
-            # Fetch all main pages (these are usually index pages, not cached)
+            # Fetch all main pages
             self.logger.info(f"Fetching {len(sites)} news sites...")
             site_content = await self.fetch_all_websites(sites)
 
@@ -458,20 +535,16 @@ class WebsiteScraper:
                 if not html:
                     continue
 
-                # Extract article links from main page
                 article_links = self.extract_article_links(html, site_url)
                 self.logger.info(
                     f"Found {len(article_links)} article links on {site_url}"
                 )
 
-                # Limit number of articles to fetch per site
-                for link in article_links[:5]:
-                    # Normalize URL for deduplication
+                for link in article_links:
                     normalized_url = self._normalize_url(link)
                     if normalized_url not in all_article_urls:
                         all_article_urls.add(normalized_url)
 
-                        # Check if already scraped recently
                         if not self._check_if_recently_scraped(link):
                             articles_to_fetch.append(link)
                         else:
@@ -498,7 +571,6 @@ class WebsiteScraper:
 
                         # Skip if missing required data
                         if not (article_data["headline"] and article_data["content"]):
-                            # Store failed extraction
                             self._store_scraped_article(
                                 article_url,
                                 headline=article_data.get("headline"),
@@ -506,7 +578,7 @@ class WebsiteScraper:
                             )
                             continue
 
-                        # Deduplicate by headline (case-insensitive)
+                        # Deduplicate by headline
                         headline_normalized = article_data["headline"].lower().strip()
                         if headline_normalized in seen_headlines:
                             self.logger.debug(
@@ -514,7 +586,7 @@ class WebsiteScraper:
                             )
                             continue
 
-                        # Deduplicate by content hash (first 500 chars)
+                        # Deduplicate by content hash
                         content_hash = hash(
                             article_data["content"][:500].lower().strip()
                         )
@@ -541,7 +613,7 @@ class WebsiteScraper:
                 f"Extracted {len(all_articles)} unique articles after deduplication"
             )
 
-            # Clean up old records periodically (every 10th run roughly)
+            # Clean up old records periodically
             import random
 
             if random.random() < 0.1:
@@ -550,47 +622,25 @@ class WebsiteScraper:
             return all_articles
 
     def _is_news_site_url(self, url: str) -> bool:
-        """Check if a URL is a main news site URL (not an article).
-
-        Args:
-            url: URL to check
-
-        Returns:
-            True if URL is a configured news site
-        """
-        # Normalize both URLs for comparison
+        """Check if a URL is a main news site URL."""
         normalized_url = self._normalize_url(url)
-
-        # Check against configured news sites
         return any(
-            self._normalize_url(news_site) == normalized_url
-            for news_site in self.config.news_sites
+            self._normalize_url(str(news_site)) == normalized_url
+            for news_site in getattr(self.config, "news_sites", [])
         )
 
     def _normalize_url(self, url: str) -> str:
-        """Normalize URL for deduplication by removing common variations.
-
-        Args:
-            url: URL to normalize
-
-        Returns:
-            Normalized URL string
-        """
-        # Remove trailing slashes
+        """Normalize URL for deduplication."""
         url = url.rstrip("/").lower()
-
-        # Remove fragment identifiers (do this early to avoid unnecessary processing)
         fragment_pos = url.find("#")
         if fragment_pos != -1:
             url = url[:fragment_pos]
 
-        # Remove common tracking parameters
         query_pos = url.find("?")
         if query_pos != -1:
             base_url = url[:query_pos]
             params = url[query_pos + 1 :].lower()
 
-            # Use a list comprehension for filtering parameters
             tracking_prefixes = {"utm_", "fbclid", "gclid"}
             tracking_substrings = {"ref=", "source="}
 
@@ -603,44 +653,27 @@ class WebsiteScraper:
                 )
             ]
 
-            # Reconstruct the URL
             if essential_params:
                 url = f"{base_url}?{'&'.join(essential_params)}"
             else:
                 url = base_url
 
-        # Convert to lowercase for comparison
         return url.lower()
 
     def _hash_string(self, text: str) -> str:
-        """Create hash of string for comparison.
-
-        Args:
-            text: Text to hash
-
-        Returns:
-            SHA-256 hash hex string
-        """
+        """Create hash of string for comparison."""
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def _check_if_recently_scraped(self, url: str) -> bool:
-        """Check if URL was recently scraped.
-
-        Args:
-            url: URL to check
-
-        Returns:
-            True if URL was recently scraped and should be skipped
-        """
+        """Check if URL was recently scraped."""
         if not self.skip_recently_scraped:
             return False
 
         normalized_url = self._normalize_url(url)
         url_hash = self._hash_string(normalized_url)
 
-        # Calculate cutoff time
         cutoff_time = (
-            datetime.now() - timedelta(hours=self.scraping_cache_hours)
+            datetime.now() - timedelta(hours=int(self.scraping_cache_hours))
         ).isoformat()
 
         with sqlite3.connect(self.db_path) as conn:
@@ -670,14 +703,7 @@ class WebsiteScraper:
         content: Optional[str] = None,
         success: bool = True,
     ) -> None:
-        """Store scraped article in database.
-
-        Args:
-            url: Article URL
-            headline: Article headline if extracted
-            content: Article content if extracted
-            success: Whether scraping was successful
-        """
+        """Store scraped article in database."""
         normalized_url = self._normalize_url(url)
         url_hash = self._hash_string(normalized_url)
 
@@ -687,8 +713,6 @@ class WebsiteScraper:
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-
-            # Use INSERT OR REPLACE to update if URL already exists
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO scraped_articles
@@ -705,19 +729,11 @@ class WebsiteScraper:
                     success,
                 ),
             )
-
             conn.commit()
             self.logger.debug(f"Stored scraped article: {url[:100]}")
 
     def cleanup_old_scraped_records(self, days_to_keep: int = 7) -> int:
-        """Clean up old scraped article records from database.
-
-        Args:
-            days_to_keep: Number of days to keep records
-
-        Returns:
-            Number of records deleted
-        """
+        """Clean up old scraped article records from database."""
         cutoff_date = (datetime.now() - timedelta(days=days_to_keep)).isoformat()
 
         with sqlite3.connect(self.db_path) as conn:
