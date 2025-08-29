@@ -18,6 +18,9 @@ install: ## Install production dependencies
 install-dev: ## Install development dependencies
 	uv sync --group dev
 
+install-playwright: install-dev ## Install Playwright browsers
+	uv run playwright install --with-deps --only-shell chromium
+
 # Application Commands
 run: ## Run the bot
 	uv run python -m hudson_news_bot.main

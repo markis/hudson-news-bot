@@ -4,13 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Hudson News Bot is a Python news aggregation bot that integrates with Reddit using the Claude SDK. It aggregates news articles, provides content summarization, and includes deduplication capabilities to prevent duplicate posts.
+Hudson News Bot is a Python news aggregation bot that integrates with Reddit using the Claude SDK. It aggregates news
+articles, provides content summarization, and includes deduplication capabilities to prevent duplicate posts.
 
 ## Essential Commands
 
 Use the included Makefile for streamlined development. Run `make help` to see all available commands.
 
 ### Quick Start
+
 ```bash
 # Setup development environment
 make install-dev
@@ -26,12 +28,14 @@ make pre-commit
 ```
 
 ### Development Setup
+
 ```bash
 make install-dev    # Install dependencies with development tools
 make install        # Install production dependencies only
 ```
 
 ### Running the Application
+
 ```bash
 make run            # Basic run
 make run-dry        # Dry-run with debug logging
@@ -40,6 +44,7 @@ make stats          # Show bot statistics
 ```
 
 ### Code Quality (Required Before Commits)
+
 ```bash
 make quality        # Run all checks: lint, typecheck, security
 make lint           # Ruff linting only
@@ -49,6 +54,7 @@ make security       # Bandit security analysis
 ```
 
 ### Testing
+
 ```bash
 make test           # Run tests
 make test-cov       # Run tests with coverage report
@@ -66,6 +72,7 @@ The codebase follows a modular structure with clear separation of concerns:
 - **utils/**: Shared utilities for logging and TOML handling
 
 Key architectural patterns:
+
 - Async/await for main operations
 - Dependency injection via configuration
 - CLI interface with comprehensive argument parsing

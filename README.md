@@ -1,13 +1,15 @@
 # Hudson News Bot
 
-A Python news aggregation bot that integrates with Reddit using the Claude SDK. The bot aggregates news articles, provides intelligent content summarization, and includes deduplication capabilities to prevent duplicate posts.
+A Python news aggregation bot that integrates with Reddit using the Claude SDK.
+The bot aggregates news articles, provides intelligent content summarization,
+and includes de-duplication capabilities to prevent duplicate posts.
 
 ## Features
 
 - 🔄 **News Aggregation**: Automatically fetches and processes news articles
 - 🤖 **Claude Integration**: Uses Claude SDK for intelligent content summarization
 - 📱 **Reddit Integration**: Posts content to Reddit with PRAW
-- 🚫 **Deduplication**: Prevents duplicate content from being posted
+- 🚫 **De-duplication**: Prevents duplicate content from being posted
 - ⚙️ **Configurable**: Flexible configuration via TOML files and environment variables
 - 📊 **Statistics**: Built-in analytics and connection testing
 - 🔍 **Dry Run Mode**: Test functionality without actually posting
@@ -21,39 +23,45 @@ A Python news aggregation bot that integrates with Reddit using the Claude SDK. 
 ## Installation
 
 1. **Clone the repository**:
+
    ```bash
    git clone <repository-url>
    cd hudson-news-bot
    ```
 
 2. **Install dependencies**:
+
    ```bash
    make install-dev
    ```
 
 3. **Set up environment variables**:
+
    ```bash
    cp .env.example .env
    # Edit .env with your API credentials
    ```
 
 4. **Configure Reddit API**:
-   - Go to https://www.reddit.com/prefs/apps
+   - Go to <https://www.reddit.com/prefs/apps>
    - Create a new application
    - Add client ID and secret to your `.env` file
 
 5. **Configure Claude API**:
    - **Option 1 (Recommended)**: If you have Claude Pro/Max:
+
      ```bash
      claude login
      ```
-   - **Option 2**: Use API key from https://console.anthropic.com/
+
+   - **Option 2**: Use API key from <https://console.anthropic.com/>
 
 ## Usage
 
 ### Quick Start with Make
 
-The project includes a Makefile for streamlined development. Run `make help` to see all available commands.
+The project includes a Makefile for streamlined development.
+Run `make help` to see all available commands.
 
 ```bash
 # Setup and run basic development cycle
@@ -174,7 +182,7 @@ file = "logs/bot.log"
 
 The project follows a modular architecture:
 
-```
+```text
 src/hudson_news_bot/
 ├── main.py              # Entry point and NewsBot orchestrator
 ├── config/              # Configuration management
@@ -247,7 +255,7 @@ uv run pytest -v
 
 ### Common Issues
 
-1. **Reddit API Errors**: Ensure your Reddit app credentials are correct and you have proper permissions
+1. **Reddit API Errors**: Ensure your Reddit app credentials are correct
 2. **Claude API Issues**: Verify your authentication (CLI login or API key)
 3. **Connection Failures**: Use `--test-connections` to diagnose network issues
 4. **Configuration Problems**: Check your `.env` file and TOML configuration syntax
@@ -288,6 +296,7 @@ make test-cov
 ## Support
 
 For issues and questions:
+
 - Check the troubleshooting section above
 - Review the logs with debug mode enabled
 - Open an issue on the repository
