@@ -3,7 +3,17 @@ FROM mcr.microsoft.com/playwright/python:v1.54.0-noble
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
   PYTHONUNBUFFERED=1 \
-  UV_CACHE_DIR=/tmp/uv-cache
+  UV_FROZEN=true \
+  UV_NO_EDITABLE=true \
+  UV_NO_MANAGED_PYTHON=true \
+  UV_COMPILE_BYTECODE=true \
+  UV_SYSTEM_PYTHON=true \
+  UV_CACHE_DIR=/var/cache/uv \
+  UV_PROJECT_ENVIRONMENT=/usr/local \
+  HATCH_BUILD_HOOK_ENABLE_MYPYC=1
+
+# Install shell only chromium for Playwright
+RUN playwright install --with-deps --only-shell chromium
 
 # Install system dependencies including cron
 RUN apt-get update && apt-get install -y \
@@ -20,7 +30,9 @@ RUN apt-get update && apt-get install -y \
 RUN npm install -g @anthropic-ai/claude-code
 
 # Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+RUN --mount=from=ghcr.io/astral-sh/uv,source=/uv,target=/bin/uv \
+  --mount=type=cache,target=/var/cache/uv/ \
+  uv sync --no-install-project
 
 # Create app directory
 WORKDIR /app
@@ -35,14 +47,11 @@ COPY config/ config/
 # Install the project and its dependencies globally using system Python
 RUN uv pip install --system -e .
 
-# Install shell only chromium for Playwright
-RUN playwright install --with-deps --only-shell chromium
-
 # Create cron job script
 RUN echo '#!/bin/bash\n\
   export PYTHONDONTWRITEBYTECODE=1\n\
   export PYTHONUNBUFFERED=1\n\
-  export UV_CACHE_DIR=/tmp/uv-cache\n\
+  export UV_CACHE_DIR=/var/cache/uv\n\
   # Source environment variables from /app/.env if it exists\n\
   if [ -f /app/.env ]; then\n\
   set -a\n\
