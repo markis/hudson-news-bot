@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM mcr.microsoft.com/playwright/python:v1.54.0-noble
+FROM ubuntu:24.04
 
 # =============================================================================
 # Environment Configuration
@@ -12,7 +12,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
   UV_COMPILE_BYTECODE=true \
   UV_SYSTEM_PYTHON=true \
   UV_CACHE_DIR=/var/cache/uv \
-  UV_PROJECT_ENVIRONMENT=/usr/local \
+  UV_PROJECT_ENVIRONMENT=/usr/ \
+  PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
   HATCH_BUILD_HOOK_ENABLE_MYPYC=1
 
 # =============================================================================
@@ -20,10 +21,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # =============================================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
   curl \
+  python3 \
   nodejs \
   npm \
   cron \
-  && playwright install --with-deps --only-shell chromium \
   && npm install -g @anthropic-ai/claude-code \
   && rm -rf /var/lib/apt/lists/*
 
@@ -35,18 +36,16 @@ WORKDIR /app
 # Copy dependency files first for better layer caching
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies using uv with caching
-RUN --mount=from=ghcr.io/astral-sh/uv,source=/uv,target=/bin/uv \
-  --mount=type=cache,target=/var/cache/uv/ \
-  uv sync --no-install-project
-
 # Copy application code
 COPY src/ src/
 COPY config/ config/
 
-# Install the application
+# Install dependencies using uv with caching
 RUN --mount=from=ghcr.io/astral-sh/uv,source=/uv,target=/bin/uv \
-  uv pip install --system -e .
+  --mount=type=cache,target=/var/cache/uv/ \
+  uv sync \
+  && playwright install --with-deps --only-shell chromium \
+  && rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
 # Runtime Scripts & Configuration

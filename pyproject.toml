@@ -12,7 +12,7 @@ dependencies = [
   "asyncpraw>=7.8.1",
   "beautifulsoup4>=4.12.0",
   "claude-code-sdk>=0.0.20",
-  "playwright>=1.49.0",
+  "playwright>=1.55.0",
   "tomli-w>=1.2.0",
 ]
 

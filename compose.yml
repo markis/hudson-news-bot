@@ -16,9 +16,7 @@ services:
       # Mount database
       - ./data/:/app/data
     restart: unless-stopped
-    command:
-      # sleep infinity
-      ["hudson-news-bot", "--log-level", "DEBUG"]
+    # command: sleep infinity # uncomment to debug
 
 networks:
   default:
