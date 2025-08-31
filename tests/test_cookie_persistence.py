@@ -38,14 +38,14 @@ class TestCookiePersistence:
                 "name": "session_id",
                 "value": "test_session_123",
                 "domain": "example.com",
-                "path": "/"
+                "path": "/",
             },
             {
                 "name": "user_pref",
                 "value": "dark_mode",
-                "domain": "example.com", 
-                "path": "/"
-            }
+                "domain": "example.com",
+                "path": "/",
+            },
         ]
 
         # Mock browser context
@@ -73,9 +73,9 @@ class TestCookiePersistence:
 
         # Verify cookies were saved
         assert scraper.cookies_path.exists()
-        with open(scraper.cookies_path, 'r') as f:
+        with open(scraper.cookies_path, "r") as f:
             saved_cookies = json.load(f)
-        
+
         assert len(saved_cookies) == 2
         assert saved_cookies[0]["name"] == "session_id"
         assert saved_cookies[1]["name"] == "user_pref"
@@ -89,11 +89,11 @@ class TestCookiePersistence:
                 "name": "existing_session",
                 "value": "existing_value_456",
                 "domain": "example.com",
-                "path": "/"
+                "path": "/",
             }
         ]
 
-        with open(scraper.cookies_path, 'w') as f:
+        with open(scraper.cookies_path, "w") as f:
             json.dump(test_cookies, f)
 
         # Mock browser context
@@ -110,11 +110,15 @@ class TestCookiePersistence:
         mock_playwright.stop.return_value = None
 
         # Mock the async_playwright() function
-        with patch('hudson_news_bot.news.scraper.async_playwright') as mock_async_playwright:
+        with patch(
+            "hudson_news_bot.news.scraper.async_playwright"
+        ) as mock_async_playwright:
             mock_async_playwright_instance = AsyncMock()
-            mock_async_playwright_instance.start = AsyncMock(return_value=mock_playwright)
+            mock_async_playwright_instance.start = AsyncMock(
+                return_value=mock_playwright
+            )
             mock_async_playwright.return_value = mock_async_playwright_instance
-            
+
             # Test loading cookies on enter
             await scraper.__aenter__()
 

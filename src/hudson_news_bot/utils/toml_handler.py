@@ -43,6 +43,7 @@ class TOMLHandler:
                     summary=item_data.get("summary", ""),
                     publication_date=pub_date,
                     link=item_data.get("link", ""),
+                    flair=item_data.get("flair"),
                 )
                 news_items.append(news_item)
 

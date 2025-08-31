@@ -28,8 +28,8 @@ class NewsBot:
         self.logger = logging.getLogger(__name__)
 
         # Initialize components
-        self.news_aggregator = NewsAggregator(config)
         self.reddit_client = RedditClient(config)
+        self.news_aggregator = NewsAggregator(config, self.reddit_client)
         self.deduplicator = DuplicationChecker(self.reddit_client, config)
 
     async def cleanup(self) -> None:
@@ -141,7 +141,13 @@ class NewsBot:
 
             self.logger.info(f"Found {len(unique_news_items)} unique items to post")
 
-            # Step 5: Post to Reddit
+            # Step 5: Post to Reddit (articles already categorized during aggregation)
+            self.logger.info(f"{'[DRY RUN] ' if dry_run else ''}Posting to Reddit...")
+            submissions = await self.reddit_client.submit_multiple_news_items(
+                unique_news_items, dry_run=dry_run
+            )
+
+            # Step 6: Post to Reddit
             self.logger.info(f"{'[DRY RUN] ' if dry_run else ''}Posting to Reddit...")
             submissions = await self.reddit_client.submit_multiple_news_items(
                 unique_news_items, dry_run=dry_run
@@ -158,7 +164,7 @@ class NewsBot:
             deleted_count = self.deduplicator.cleanup_old_records()
             self.logger.debug(f"Deleted {deleted_count} old records")
 
-            # Step 8: Report results
+            # Step 7: Report results
             successful_count = sum(1 for s in submissions if s is not None)
             self.logger.info(
                 f"Workflow completed: {successful_count}/{len(unique_news_items)} items posted successfully"

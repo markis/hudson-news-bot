@@ -16,15 +16,19 @@ class NewsItem:
     summary: str
     publication_date: datetime
     link: str
+    flair: str | None = None
 
     def to_toml_dict(self) -> dict[str, str]:
         """Convert to dictionary suitable for TOML serialization."""
-        return {
+        result = {
             "headline": self.headline,
             "summary": self.summary,
             "publication_date": self.publication_date.strftime("%Y-%m-%d"),
             "link": self.link,
         }
+        if self.flair:
+            result["flair"] = self.flair
+        return result
 
 
 @dataclass

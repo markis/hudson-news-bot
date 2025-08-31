@@ -18,6 +18,7 @@ from claude_code_sdk import (
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsCollection
 from hudson_news_bot.news.scraper import NewsItemDict, WebsiteScraper
+from hudson_news_bot.reddit.client import RedditClient
 from hudson_news_bot.utils.toml_handler import TOMLHandler
 
 
@@ -28,13 +29,15 @@ class NewsAggregator:
     logger: Final[Logger]
     options: Final[ClaudeCodeOptions]
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, reddit_client: RedditClient | None = None):
         """Initialize the news aggregator.
 
         Args:
             config: Configuration instance
+            reddit_client: Reddit client for getting flair options (optional)
         """
         self.config = config
+        self.reddit_client = reddit_client
         self.logger = logging.getLogger(__name__)
 
         # Configure Claude SDK options for analyzing scraped content
@@ -73,9 +76,20 @@ class NewsAggregator:
             f"Scraped {len(articles)} articles, sending to Claude for analysis"
         )
 
+        # Get flair options if reddit client is available
+        flair_options = []
+        if self.reddit_client:
+            try:
+                flair_options = await self.reddit_client.get_flair_options()
+                self.logger.info(
+                    f"Retrieved {len(flair_options)} flair options for categorization"
+                )
+            except Exception as e:
+                self.logger.warning(f"Could not get flair options: {e}")
+
         # Send scraped content to Claude for analysis
         async with ClaudeSDKClient(options=self.options) as client:
-            prompt = self.create_analysis_prompt(articles)
+            prompt = self.create_analysis_prompt(articles, flair_options)
             self.logger.debug("Sending analysis prompt to Claude")
 
             # Send query and collect response
@@ -99,7 +113,9 @@ class NewsAggregator:
 
         raise Exception("No response received from Claude")
 
-    def create_analysis_prompt(self, articles: list[NewsItemDict]) -> str:
+    def create_analysis_prompt(
+        self, articles: list[NewsItemDict], flair_options: list[str] | None = None
+    ) -> str:
         """Create the prompt for Claude to analyze scraped articles.
 
         Args:
@@ -122,31 +138,42 @@ Content Preview: {(article.get("content") or "N/A")[:500]}...
 """
             article_summaries.append(summary)
 
+        # Add flair options to prompt if available
+        flair_section = ""
+        if flair_options:
+            flair_list = "\n".join(f"- {option}" for option in flair_options)
+            flair_section = f"""
+
+Available Categories for Classification:
+{flair_list}
+
+For each article, also assign the most appropriate category from the list above."""
+
         prompt = f"""Today is {today}. I've scraped the following articles from Hudson, Ohio news sites.
 Please analyze them and identify the NEWEST and most relevant local news articles.
 
 {chr(10).join(article_summaries)}
 
-From these articles, select the most recent and relevant Hudson, Ohio news stories.
+From these articles, select the most recent and relevant Hudson, Ohio news stories.{flair_section}
 For each selected article, format your response as valid TOML using this EXACT structure:
 
 [[news]]
 headline = "story headline"
 summary = "brief 2-3 sentence summary of the article"
 publication_date = "YYYY-MM-DD"
-link = "https://source.com/article"
+link = "https://source.com/article"{' flair = "category name"' if flair_options else ""}
 
 [[news]]
 headline = "second story headline"
 summary = "second story summary"
 publication_date = "YYYY-MM-DD"
-link = "https://source.com/second-article"
+link = "https://source.com/second-article"{' flair = "category name"' if flair_options else ""}
 
 IMPORTANT:
 - Only include articles that are clearly about Hudson, Ohio or directly relevant to Hudson residents
 - Prioritize the most recent articles (from today or yesterday)
 - Ensure dates are in YYYY-MM-DD format
-- Write clear, concise summaries that capture the key points
+- Write clear, concise summaries that capture the key points{" - Assign the most appropriate flair/category from the provided list" if flair_options else ""}
 - Output ONLY the TOML data, no explanatory text
 - If no relevant articles are found, return an empty TOML array like this:
 [[news]]

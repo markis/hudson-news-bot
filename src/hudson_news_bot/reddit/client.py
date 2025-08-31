@@ -102,7 +102,7 @@ class RedditClient:
         """
         title = news_item.headline
         if len(title) > 300:  # Reddit title limit
-            title = title[:297] + "..."
+            title = title[:299] + "…"
 
         self.logger.info(f"{'[DRY RUN] ' if dry_run else ''}Submitting: {title}")
 
@@ -110,12 +110,16 @@ class RedditClient:
             self.logger.info(f"Would submit to r/{self.config.subreddit_name}")
             self.logger.info(f"Title: {title}")
             self.logger.info(f"URL: {news_item.link}")
+            if news_item.flair:
+                self.logger.info(f"Flair: {news_item.flair}")
             return None
 
         subreddit = await self._get_subreddit()
 
         try:
-            submission = await subreddit.submit(title=title, url=news_item.link)
+            submission = await subreddit.submit(
+                title=title, url=news_item.link, flair_text=news_item.flair
+            )
 
             # Construct the submission URL since submission.url requires loading
             submission_url = f"https://reddit.com/r/{self.config.subreddit_name}/comments/{submission.id}"
@@ -197,8 +201,8 @@ class RedditClient:
             )
             return submissions
 
-        except Exception as e:
-            self.logger.error(f"Error searching Reddit: {e}")
+        except Exception:
+            self.logger.exception("Error searching Reddit")
             return []
 
     async def get_recent_submissions(self, limit: int = 100) -> list[Submission]:
@@ -219,8 +223,8 @@ class RedditClient:
             self.logger.debug(f"Retrieved {len(submissions)} recent submissions")
             return submissions
 
-        except Exception as e:
-            self.logger.error(f"Error getting recent submissions: {e}")
+        except Exception:
+            self.logger.exception("Error getting recent submissions")
             return []
 
     async def get_user_submissions(self, limit: int = 100) -> list[Submission]:
@@ -248,8 +252,38 @@ class RedditClient:
             self.logger.debug(f"Retrieved {len(submissions)} user submissions")
             return submissions
 
-        except Exception as e:
-            self.logger.error(f"Error getting user submissions: {e}")
+        except Exception:
+            self.logger.exception("Error getting user submissions")
+            return []
+
+    async def get_flair_options(self) -> list[str]:
+        """Get available flair options for the subreddit.
+
+        Returns:
+            List of flair text options
+        """
+        subreddit = await self._get_subreddit()
+
+        try:
+            flair_options: list[str] = []
+            async for flair in subreddit.flair.link_templates:
+                try:
+                    text: str | None = None
+                    if isinstance(flair, dict) and "text" in flair:
+                        text = flair["text"]
+                    elif not isinstance(flair, dict) and hasattr(flair, "text"):
+                        text = getattr(flair, "text")
+
+                    if text and isinstance(text, str):
+                        flair_options.append(text)
+                except (AttributeError, KeyError, TypeError):
+                    continue
+
+            self.logger.debug(f"Retrieved {len(flair_options)} flair options")
+            return flair_options
+
+        except Exception:
+            self.logger.exception("Error getting flair options")
             return []
 
     async def test_connection(self) -> bool:
