@@ -39,6 +39,7 @@ class NewsAggregator:
         self.config = config
         self.reddit_client = reddit_client
         self.logger = logging.getLogger(__name__)
+        self.flair_mapping: dict[str, str] = {}
 
         # Configure Claude SDK options for analyzing scraped content
         self.options = ClaudeCodeOptions(
@@ -77,10 +78,11 @@ class NewsAggregator:
         )
 
         # Get flair options if reddit client is available
-        flair_options = []
+        flair_options = {}
         if self.reddit_client:
             try:
                 flair_options = await self.reddit_client.get_flair_options()
+                self.flair_mapping = flair_options  # Store for later use
                 self.logger.info(
                     f"Retrieved {len(flair_options)} flair options for categorization"
                 )
@@ -114,7 +116,7 @@ class NewsAggregator:
         raise Exception("No response received from Claude")
 
     def create_analysis_prompt(
-        self, articles: list[NewsItemDict], flair_options: list[str] | None = None
+        self, articles: list[NewsItemDict], flair_options: dict[str, str] | None = None
     ) -> str:
         """Create the prompt for Claude to analyze scraped articles.
 
@@ -141,7 +143,7 @@ Content Preview: {(article.get("content") or "N/A")[:500]}...
         # Add flair options to prompt if available
         flair_section = ""
         if flair_options:
-            flair_list = "\n".join(f"- {option}" for option in flair_options)
+            flair_list = "\n".join(f"- {text}" for text in flair_options.keys())
             flair_section = f"""
 
 Available Categories for Classification:
@@ -181,7 +183,9 @@ IMPORTANT:
 
         return prompt
 
-    def _parse_response(self, response: str) -> NewsCollection:
+    def _parse_response(
+        self, response: str, flair_mapping: dict[str, str] | None = None
+    ) -> NewsCollection:
         """Parse Claude's response into NewsCollection.
 
         Args:
@@ -207,7 +211,9 @@ IMPORTANT:
                 raise ValueError("Invalid TOML syntax in response")
 
             # Parse into NewsCollection
-            news_collection = TOMLHandler.parse_news_toml(toml_content)
+            news_collection = TOMLHandler.parse_news_toml(
+                toml_content, flair_mapping or self.flair_mapping
+            )
 
             self.logger.info(f"Successfully parsed {len(news_collection)} news items")
             return news_collection

@@ -23,7 +23,9 @@ class TOMLHandler:
             return tomllib.load(f)
 
     @staticmethod
-    def parse_news_toml(toml_content: str) -> NewsCollection:
+    def parse_news_toml(
+        toml_content: str, flair_mapping: dict[str, str] | None = None
+    ) -> NewsCollection:
         """Parse TOML content into NewsCollection."""
         try:
             data = tomllib.loads(toml_content)
@@ -38,12 +40,21 @@ class TOMLHandler:
                     # Try alternative format or use current date as fallback
                     pub_date = datetime.now()
 
+                # Get flair info
+                flair_text = item_data.get("flair")
+                flair_id = item_data.get("flair_id")
+
+                # If we have flair text but no ID, and we have a mapping, look it up
+                if flair_text and not flair_id and flair_mapping:
+                    flair_id = flair_mapping.get(flair_text)
+
                 news_item = NewsItem(
                     headline=item_data.get("headline", ""),
                     summary=item_data.get("summary", ""),
                     publication_date=pub_date,
                     link=item_data.get("link", ""),
-                    flair=item_data.get("flair"),
+                    flair=flair_text,
+                    flair_id=flair_id,
                 )
                 news_items.append(news_item)
 

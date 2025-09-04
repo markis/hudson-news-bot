@@ -17,6 +17,7 @@ class NewsItem:
     publication_date: datetime
     link: str
     flair: str | None = None
+    flair_id: str | None = None
 
     def to_toml_dict(self) -> dict[str, str]:
         """Convert to dictionary suitable for TOML serialization."""
@@ -28,6 +29,8 @@ class NewsItem:
         }
         if self.flair:
             result["flair"] = self.flair
+        if self.flair_id:
+            result["flair_id"] = self.flair_id
         return result
 
 

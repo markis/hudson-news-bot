@@ -112,14 +112,24 @@ class RedditClient:
             self.logger.info(f"URL: {news_item.link}")
             if news_item.flair:
                 self.logger.info(f"Flair: {news_item.flair}")
+            if news_item.flair_id:
+                self.logger.info(f"Flair ID: {news_item.flair_id}")
             return None
 
         subreddit = await self._get_subreddit()
 
         try:
-            submission = await subreddit.submit(
-                title=title, url=news_item.link, flair_text=news_item.flair
-            )
+            # Submit with flair_id if available, otherwise use flair_text
+            if news_item.flair_id:
+                submission = await subreddit.submit(
+                    title=title, url=news_item.link, flair_id=news_item.flair_id
+                )
+            elif news_item.flair:
+                submission = await subreddit.submit(
+                    title=title, url=news_item.link, flair_text=news_item.flair
+                )
+            else:
+                submission = await subreddit.submit(title=title, url=news_item.link)
 
             # Construct the submission URL since submission.url requires loading
             submission_url = f"https://reddit.com/r/{self.config.subreddit_name}/comments/{submission.id}"
@@ -256,26 +266,35 @@ class RedditClient:
             self.logger.exception("Error getting user submissions")
             return []
 
-    async def get_flair_options(self) -> list[str]:
+    async def get_flair_options(self) -> dict[str, str]:
         """Get available flair options for the subreddit.
 
         Returns:
-            List of flair text options
+            Dictionary mapping flair text to flair ID
         """
         subreddit = await self._get_subreddit()
 
         try:
-            flair_options: list[str] = []
+            flair_options: dict[str, str] = {}
             async for flair in subreddit.flair.link_templates:
                 try:
-                    text: str | None = None
-                    if isinstance(flair, dict) and "text" in flair:
-                        text = flair["text"]
-                    elif not isinstance(flair, dict) and hasattr(flair, "text"):
-                        text = getattr(flair, "text")
+                    text = None
+                    flair_id = None
 
-                    if text and isinstance(text, str):
-                        flair_options.append(text)
+                    if isinstance(flair, dict):
+                        text = flair.get("text")
+                        flair_id = flair.get("id")
+                    elif not isinstance(flair, dict) and hasattr(flair, "text"):
+                        text = getattr(flair, "text", None)
+                        flair_id = getattr(flair, "id", None)
+
+                    if (
+                        text
+                        and flair_id
+                        and isinstance(text, str)
+                        and isinstance(flair_id, str)
+                    ):
+                        flair_options[text] = flair_id
                 except (AttributeError, KeyError, TypeError):
                     continue
 
@@ -284,7 +303,7 @@ class RedditClient:
 
         except Exception:
             self.logger.exception("Error getting flair options")
-            return []
+            return {}
 
     async def test_connection(self) -> bool:
         """Test Reddit API connection.
