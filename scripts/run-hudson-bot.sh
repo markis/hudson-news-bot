@@ -4,6 +4,7 @@
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONUNBUFFERED=1
 export UV_CACHE_DIR=/var/cache/uv
+export PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 # Source environment variables from /app/.env if it exists
 if [ -f /app/.env ]; then
@@ -20,4 +21,3 @@ echo "[$(date)] Starting Hudson News Bot run..." >>/var/log/hudson-news-bot.log
 
 # Log completion
 echo "[$(date)] Hudson News Bot run completed" >>/var/log/hudson-news-bot.log
-

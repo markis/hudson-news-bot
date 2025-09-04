@@ -13,7 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
   UV_SYSTEM_PYTHON=true \
   UV_CACHE_DIR=/var/cache/uv \
   UV_PROJECT_ENVIRONMENT=/usr/ \
-  PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+  PLAYWRIGHT_BROWSERS_PATH=/opt/playwright \
   HATCH_BUILD_HOOK_ENABLE_MYPYC=1
 
 # =============================================================================
