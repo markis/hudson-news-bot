@@ -4,7 +4,7 @@ import asyncio
 import logging
 import sys
 from datetime import datetime, timedelta
-from typing import Any, List, Optional
+from typing import Any, List
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.aggregator import NewsAggregator
@@ -36,9 +36,7 @@ class NewsBot:
         """Clean up resources."""
         await self.reddit_client.close()
 
-    async def run(
-        self, dry_run: bool = False, output_file: Optional[str] = None
-    ) -> bool:
+    async def run(self, dry_run: bool = False, output_file: str | None = None) -> bool:
         """Run the complete news aggregation and posting workflow.
 
         Args:
@@ -147,12 +145,6 @@ class NewsBot:
                 unique_news_items, dry_run=dry_run
             )
 
-            # Step 6: Post to Reddit
-            self.logger.info(f"{'[DRY RUN] ' if dry_run else ''}Posting to Reddit...")
-            submissions = await self.reddit_client.submit_multiple_news_items(
-                unique_news_items, dry_run=dry_run
-            )
-
             # Step 6: Record successful submissions
             if not dry_run:
                 for news_item, submission in zip(unique_news_items, submissions):
@@ -164,7 +156,7 @@ class NewsBot:
             deleted_count = self.deduplicator.cleanup_old_records()
             self.logger.debug(f"Deleted {deleted_count} old records")
 
-            # Step 7: Report results
+            # Step 8: Report results
             successful_count = sum(1 for s in submissions if s is not None)
             self.logger.info(
                 f"Workflow completed: {successful_count}/{len(unique_news_items)} items posted successfully"
@@ -281,7 +273,7 @@ async def main() -> None:
 
     logger = logging.getLogger(__name__)
 
-    bot: Optional[NewsBot] = None
+    bot: NewsBot | None = None
 
     try:
         # Load configuration
