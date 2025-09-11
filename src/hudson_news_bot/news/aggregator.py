@@ -97,21 +97,18 @@ class NewsAggregator:
             # Send query and collect response
             await client.query(prompt)
 
-            # Build response from text blocks
-            response_chunks: list[str] = []
+            # Build response from text blocks efficiently
+            response_parts: list[str] = []
             async for message in client.receive_response():
                 self.logger.debug(f"Received message: {message}")
                 if isinstance(message, AssistantMessage):
-                    response_chunks.extend(
-                        content.text
-                        for content in message.content
-                        if isinstance(content, TextBlock)
-                    )
+                    for content in message.content:
+                        if isinstance(content, TextBlock):
+                            response_parts.append(content.text)
 
             # Parse and return results if response received
-            if response_chunks:
-                content = " ".join(response_chunks)
-                return self._parse_response(content)
+            if response_parts:
+                return self._parse_response("".join(response_parts))
 
         raise Exception("No response received from Claude")
 
@@ -128,17 +125,17 @@ class NewsAggregator:
         """
         today = datetime.datetime.now().strftime("%Y-%m-%d")
 
-        # Prepare article summaries for Claude
-        article_summaries: list[str] = []
-        for i, article in enumerate(articles[:20], 1):  # Limit to first 20 articles
-            summary = f"""
+        # Prepare article summaries for Claude efficiently
+        article_summaries: list[str] = [
+            f"""
 Article {i}:
 URL: {article.get("url", "N/A")}
 Headline: {article.get("headline", "N/A")}
 Date: {article.get("date", "N/A")}
 Content Preview: {(article.get("content") or "N/A")[:500]}...
 """
-            article_summaries.append(summary)
+            for i, article in enumerate(articles[:20], 1)  # Limit to first 20 articles
+        ]
 
         # Add flair options to prompt if available
         flair_section = ""
@@ -154,7 +151,7 @@ For each article, also assign the most appropriate category from the list above.
         prompt = f"""Today is {today}. I've scraped the following articles from Hudson, Ohio news sites.
 Please analyze them and identify the NEWEST and most relevant local news articles.
 
-{chr(10).join(article_summaries)}
+{"".join(article_summaries)}
 
 From these articles, select the most recent and relevant Hudson, Ohio news stories.{flair_section}
 For each selected article, format your response as valid TOML using this EXACT structure:
@@ -163,21 +160,24 @@ For each selected article, format your response as valid TOML using this EXACT s
 headline = "story headline"
 summary = "brief 2-3 sentence summary of the article"
 publication_date = "YYYY-MM-DD"
-link = "https://source.com/article"{' flair = "category name"' if flair_options else ""}
+link = "https://source.com/article"
+{'flair = "category name"' if flair_options else ""}
 
 [[news]]
 headline = "second story headline"
 summary = "second story summary"
 publication_date = "YYYY-MM-DD"
-link = "https://source.com/second-article"{' flair = "category name"' if flair_options else ""}
+link = "https://source.com/second-article"
+{'flair = "category name"' if flair_options else ""}
 
 IMPORTANT:
 - Only include articles that are clearly about Hudson, Ohio or directly relevant to Hudson residents
 - Prioritize the most recent articles (from today or yesterday)
 - Ensure dates are in YYYY-MM-DD format
-- Write clear, concise summaries that capture the key points{" - Assign the most appropriate flair/category from the provided list" if flair_options else ""}
+- Write clear, concise summaries that capture the key points
 - Output ONLY the TOML data, no explanatory text
 - If no relevant articles are found, return an empty TOML array like this:
+{"- Assign the most appropriate flair/category from the provided list" if flair_options else ""}
 [[news]]
 """
 

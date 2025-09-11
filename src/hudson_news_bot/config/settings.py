@@ -95,7 +95,6 @@ DEFAULT_CONFIG: Final[ConfigDict] = {
         "max_articles": 5,
         "system_prompt": DEFAULT_SYSTEM_PROMPT,
         "news_sites": [
-            "https://hudsonohiotoday.com/",
             "https://www.beaconjournal.com/communities/hudsonhubtimes/",
             "https://fox8.com/tag/hudson-news/",
             "https://thesummiteer.org/posts",

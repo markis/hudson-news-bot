@@ -123,13 +123,13 @@ class TestAggregateNews:
 headline = "Hudson Council Approves Budget"
 summary = "The Hudson City Council approved a $50M budget for the upcoming fiscal year."
 publication_date = "2025-08-14"
-link = "https://hudsonohiotoday.com/budget-approval"
+link = "https://hudson.com/budget-approval"
 
 [[news]]
 headline = "New Park Opens Downtown"
 summary = "Hudson's newest park featuring walking trails and playground equipment opened to the public."
 publication_date = "2025-08-13"
-link = "https://hudsonohiotoday.com/new-park"
+link = "https://hudson.com/new-park"
 ```"""
 
     @pytest.fixture
@@ -140,13 +140,13 @@ link = "https://hudsonohiotoday.com/new-park"
                     headline="Hudson Council Approves Budget",
                     summary="The Hudson City Council approved a $50M budget for the upcoming fiscal year.",
                     publication_date=datetime(2025, 8, 14),
-                    link="https://hudsonohiotoday.com/budget-approval",
+                    link="https://hudson.com/budget-approval",
                 ),
                 NewsItem(
                     headline="New Park Opens Downtown",
                     summary="Hudson's newest park featuring walking trails and playground equipment opened to the public.",
                     publication_date=datetime(2025, 8, 13),
-                    link="https://hudsonohiotoday.com/new-park",
+                    link="https://hudson.com/new-park",
                 ),
             ]
         )
@@ -167,7 +167,7 @@ link = "https://hudsonohiotoday.com/new-park"
         mock_scraper_class.return_value = mock_scraper_instance
         mock_scraper_instance.scrape_news_sites.return_value = [
             {
-                "url": "https://hudsonohiotoday.com/article1",
+                "url": "https://hudson.com/article1",
                 "headline": "Test Article",
                 "date": "2025-08-14",
                 "content": "Test content",
@@ -217,7 +217,7 @@ link = "https://hudsonohiotoday.com/new-park"
         mock_scraper_class.return_value = mock_scraper_instance
         mock_scraper_instance.scrape_news_sites.return_value = [
             {
-                "url": "https://hudsonohiotoday.com/article1",
+                "url": "https://hudson.com/article1",
                 "headline": "Test Article",
                 "date": "2025-08-14",
                 "content": "Test content",
@@ -254,7 +254,7 @@ link = "https://hudsonohiotoday.com/new-park"
         mock_scraper_class.return_value = mock_scraper_instance
         mock_scraper_instance.scrape_news_sites.return_value = [
             {
-                "url": "https://hudsonohiotoday.com/article1",
+                "url": "https://hudson.com/article1",
                 "headline": "Test Article",
                 "date": "2025-08-14",
                 "content": "Test content",
@@ -292,9 +292,9 @@ link = "https://hudsonohiotoday.com/new-park"
         # Mock scraper
         mock_scraper_instance = AsyncMock()
         mock_scraper_class.return_value = mock_scraper_instance
-        mock_scraper_instance.scrape_news_sites.return_value = [
+        mock_scraper_instance.hudson.return_value = [
             {
-                "url": "https://hudsonohiotoday.com/article1",
+                "url": "https://hudson.com/article1",
                 "headline": "Test Article",
                 "date": "2025-08-14",
                 "content": "Test content",
@@ -335,7 +335,7 @@ link = "https://hudsonohiotoday.com/new-park"
         mock_scraper_class.return_value = mock_scraper_instance
         mock_scraper_instance.scrape_news_sites.return_value = [
             {
-                "url": "https://hudsonohiotoday.com/article1",
+                "url": "https://hudson.com/article1",
                 "headline": "Test Article",
                 "date": "2025-08-14",
                 "content": "Test content",
@@ -419,7 +419,7 @@ Additional text after TOML"""
     def test_create_analysis_prompt(self, aggregator: NewsAggregator) -> None:
         articles: list[NewsItemDict] = [
             NewsItemDict(
-                url="https://hudsonohiotoday.com/article1",
+                url="https://hudson.com/article1",
                 headline="Test Article 1",
                 date="2025-08-14",
                 content="Test content 1",
@@ -438,5 +438,5 @@ Additional text after TOML"""
         assert "2025-" in prompt
         assert "Test Article 1" in prompt
         assert "Test Article 2" in prompt
-        assert "hudsonohiotoday.com" in prompt
+        assert "hudson.com" in prompt
         assert "beaconjournal.com" in prompt
