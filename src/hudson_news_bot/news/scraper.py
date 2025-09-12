@@ -19,7 +19,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from hudson_news_bot.config.settings import Config
 
-USER_AGENT: Final = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
+USER_AGENT: Final = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
 
 
 def get_hudson_hub_times_email() -> str | None:

@@ -11,7 +11,6 @@ Focus on finding local Hudson, Ohio news articles from the last 24-48 hours.
 Prioritize articles with clear dates and local relevance."""
 # News sites to scrape for Hudson, Ohio news
 news_sites = [
-  "https://hudsonohiotoday.com/",
   "https://www.beaconjournal.com/communities/hudsonhubtimes/",
   "https://fox8.com/tag/hudson-news/",
   "https://thesummiteer.org/posts",
