@@ -77,7 +77,7 @@ class NewsBot:
                 return False
 
             # Step 2: Aggregate news
-            self.logger.info("Aggregating news from Claude SDK...")
+            self.logger.info("Aggregating news from LLM API...")
             news_collection = await self.news_aggregator.aggregate_news()
 
             if not news_collection or len(news_collection) == 0:
@@ -299,12 +299,12 @@ async def main() -> None:
                 # Test Reddit
                 reddit_ok = await bot.reddit_client.test_connection()
 
-                # Test Claude SDK
+                # Test LLM API
                 from hudson_news_bot.news.aggregator import test_connection
 
-                claude_ok = await test_connection()
+                llm_ok = await test_connection()
 
-                if reddit_ok and claude_ok:
+                if reddit_ok and llm_ok:
                     logger.info("✅ All connections successful")
                     sys.exit(0)
                 else:

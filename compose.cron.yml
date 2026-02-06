@@ -12,10 +12,8 @@ services:
       - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET}
       - REDDIT_USER_AGENT=${REDDIT_USER_AGENT:-HudsonNewsBot/1.0}
 
-      # Claude authentication (choose one):
-      # Option 1: API Key
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      # Option 2: Use claude login (preferred for Pro/Max users)
+      # Perplexity API Key
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY:-}
 
       # Cron schedule (default: every 6 hours)
       # Format: minute hour day month day-of-week

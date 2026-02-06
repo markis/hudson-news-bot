@@ -22,10 +22,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
   curl \
   python3 \
-  nodejs \
-  npm \
   cron \
-  && npm install -g @anthropic-ai/claude-code \
   && rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
