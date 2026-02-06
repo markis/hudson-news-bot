@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "hudson-news-bot"
 version = "0.1.0"
-description = "News aggregation bot with Reddit integration using Claude SDK"
+description = "News aggregation bot with Reddit integration using Perplexity API"
 requires-python = ">=3.12"
 dependencies = [
   "aiohttp>=3.11.0",

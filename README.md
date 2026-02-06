@@ -1,13 +1,13 @@
 # Hudson News Bot
 
-A Python news aggregation bot that integrates with Reddit using the Claude SDK.
+A Python news aggregation bot that integrates with Reddit using Perplexity API.
 The bot aggregates news articles, provides intelligent content summarization,
 and includes de-duplication capabilities to prevent duplicate posts.
 
 ## Features
 
 - 🔄 **News Aggregation**: Automatically fetches and processes news articles
-- 🤖 **Claude Integration**: Uses Claude SDK for intelligent content summarization
+- 🤖 **LLM Integration**: Uses Perplexity API for intelligent content summarization
 - 📱 **Reddit Integration**: Posts content to Reddit with PRAW
 - 🚫 **De-duplication**: Prevents duplicate content from being posted
 - ⚙️ **Configurable**: Flexible configuration via TOML files and environment variables
@@ -18,7 +18,7 @@ and includes de-duplication capabilities to prevent duplicate posts.
 
 - Python 3.12+
 - Reddit API credentials
-- Claude API access (Claude Pro/Max subscription or API key)
+- Perplexity API key
 
 ## Installation
 
@@ -47,14 +47,9 @@ and includes de-duplication capabilities to prevent duplicate posts.
    - Create a new application
    - Add client ID and secret to your `.env` file
 
-5. **Configure Claude API**:
-   - **Option 1 (Recommended)**: If you have Claude Pro/Max:
-
-     ```bash
-     claude login
-     ```
-
-   - **Option 2**: Use API key from <https://console.anthropic.com/>
+5. **Configure Perplexity API**:
+   - Get your API key from <https://www.perplexity.ai/settings/api>
+   - Add it to your `.env` file as `PERPLEXITY_API_KEY`
 
 ## Usage
 
@@ -151,8 +146,8 @@ REDDIT_CLIENT_SECRET=your_client_secret
 REDDIT_USERNAME=your_username  # Optional
 REDDIT_PASSWORD=your_password  # Optional
 
-# Claude API (if not using CLI login)
-ANTHROPIC_API_KEY=your_api_key
+# Perplexity API
+PERPLEXITY_API_KEY=your_api_key
 
 # Optional settings
 LOG_LEVEL=INFO
@@ -188,7 +183,7 @@ src/hudson_news_bot/
 ├── config/              # Configuration management
 │   ├── __init__.py
 │   └── settings.py
-├── news/                # News aggregation and Claude integration
+├── news/                # News aggregation and LLM integration
 │   ├── __init__.py
 │   ├── aggregator.py    # NewsAggregator class
 │   └── models.py        # Data models
@@ -205,7 +200,7 @@ src/hudson_news_bot/
 ### Key Components
 
 - **NewsBot**: Main orchestrator that coordinates all components
-- **NewsAggregator**: Handles news fetching and Claude SDK integration
+- **NewsAggregator**: Handles news fetching and Perplexity API integration
 - **RedditClient**: Manages Reddit API interactions and posting
 - **Deduplicator**: Prevents duplicate content using content hashing
 - **Config**: Centralized configuration management with TOML support
@@ -256,7 +251,7 @@ uv run pytest -v
 ### Common Issues
 
 1. **Reddit API Errors**: Ensure your Reddit app credentials are correct
-2. **Claude API Issues**: Verify your authentication (CLI login or API key)
+2. **Perplexity API Issues**: Verify your API key is correct and has sufficient credits
 3. **Connection Failures**: Use `--test-connections` to diagnose network issues
 4. **Configuration Problems**: Check your `.env` file and TOML configuration syntax
 

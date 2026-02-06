@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance for AI coding agents (like Claude Code) working in this repository.
+This file provides guidance for AI coding agents working in this repository.
 
 ## Project Overview
 
@@ -73,7 +73,7 @@ make dev
 make run                      # Normal execution
 make run-dry                  # Dry-run with DEBUG logging (no posting)
 make run-debug                # Run with DEBUG logging
-make test-connections         # Test Reddit + Claude API connections
+make test-connections         # Test Reddit + Perplexity API connections
 make stats                    # Display bot statistics
 ```
 
@@ -85,7 +85,7 @@ src/hudson_news_bot/
 ├── config/
 │   └── settings.py           # Config management with TOML + env vars
 ├── news/
-│   ├── aggregator.py         # NewsAggregator (Claude SDK integration)
+│   ├── aggregator.py         # NewsAggregator (Perplexity API integration)
 │   ├── models.py             # NewsItem & NewsCollection dataclasses
 │   └── scraper.py            # WebsiteScraper (Playwright-based)
 ├── reddit/
