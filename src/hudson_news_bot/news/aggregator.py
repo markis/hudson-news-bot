@@ -1,33 +1,29 @@
-"""News aggregation using website scraping and Claude for article identification."""
+"""News aggregation using website scraping and LLM for article identification."""
 
 import asyncio
 import datetime
+import json
 from logging import Logger
 import logging
 import re
 import sys
-from typing import Final, Optional
+from typing import Any, Final
 
-from claude_code_sdk import (
-    AssistantMessage,
-    ClaudeCodeOptions,
-    ClaudeSDKClient,
-    TextBlock,
-)
+from openai import AsyncOpenAI
 
 from hudson_news_bot.config.settings import Config
-from hudson_news_bot.news.models import NewsCollection
+from hudson_news_bot.news.models import NewsCollection, NewsItem
 from hudson_news_bot.news.scraper import NewsItemDict, WebsiteScraper
 from hudson_news_bot.reddit.client import RedditClient
 from hudson_news_bot.utils.toml_handler import TOMLHandler
 
 
 class NewsAggregator:
-    """Handles news aggregation using Claude Code SDK."""
+    """Handles news aggregation using OpenAI-compatible LLM API."""
 
     config: Final[Config]
     logger: Final[Logger]
-    options: Final[ClaudeCodeOptions]
+    client: Final[AsyncOpenAI]
 
     def __init__(self, config: Config, reddit_client: RedditClient | None = None):
         """Initialize the news aggregator.
@@ -41,16 +37,21 @@ class NewsAggregator:
         self.logger = logging.getLogger(__name__)
         self.flair_mapping: dict[str, str] = {}
 
-        # Configure Claude SDK options for analyzing scraped content
-        self.options = ClaudeCodeOptions(
-            system_prompt=config.system_prompt,
-            max_turns=config.claude_max_turns,
-            permission_mode=config.claude_permission_mode,
-            model=config.claude_model,
+        # Configure OpenAI client for analyzing scraped content
+        api_key = config.perplexity_api_key
+        if not api_key or not api_key.strip():
+            raise ValueError(
+                "PERPLEXITY_API_KEY environment variable is required and must not be empty"
+            )
+
+        self.client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=config.llm_base_url,
+            timeout=config.llm_timeout_seconds,
         )
 
     async def aggregate_news(self) -> NewsCollection:
-        """Aggregate news stories using website scraping and Claude analysis.
+        """Aggregate news stories using website scraping and LLM analysis.
 
         Returns:
             NewsCollection containing discovered news items
@@ -74,7 +75,7 @@ class NewsAggregator:
             return NewsCollection()
 
         self.logger.info(
-            f"Scraped {len(articles)} articles, sending to Claude for analysis"
+            f"Scraped {len(articles)} articles, sending to LLM for analysis"
         )
 
         # Get flair options if reddit client is available
@@ -89,43 +90,49 @@ class NewsAggregator:
             except Exception as e:
                 self.logger.warning(f"Could not get flair options: {e}")
 
-        # Send scraped content to Claude for analysis
-        async with ClaudeSDKClient(options=self.options) as client:
-            prompt = self.create_analysis_prompt(articles, flair_options)
-            self.logger.debug("Sending analysis prompt to Claude")
+        # Send scraped content to LLM for analysis
+        prompt = self.create_analysis_prompt(articles, flair_options)
+        self.logger.debug("Sending analysis prompt to LLM")
 
-            # Send query and collect response
-            await client.query(prompt)
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.config.llm_model,
+                messages=[
+                    {"role": "system", "content": self.config.system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=self.config.llm_max_tokens,
+            )
 
-            # Build response from text blocks efficiently
-            response_parts: list[str] = []
-            async for message in client.receive_response():
-                self.logger.debug(f"Received message: {message}")
-                if isinstance(message, AssistantMessage):
-                    for content in message.content:
-                        if isinstance(content, TextBlock):
-                            response_parts.append(content.text)
+            # Extract response content
+            if response.choices and response.choices[0].message.content:
+                response_text = response.choices[0].message.content
+                return self._parse_response(response_text)
 
-            # Parse and return results if response received
-            if response_parts:
-                return self._parse_response("".join(response_parts))
+        except ValueError:
+            # Re-raise parsing errors as-is
+            raise
+        except Exception as e:
+            self.logger.error(f"LLM API request failed: {e}")
+            raise Exception(f"LLM API request failed: {e}")
 
-        raise Exception("No response received from Claude")
+        raise Exception("No response received from LLM")
 
     def create_analysis_prompt(
         self, articles: list[NewsItemDict], flair_options: dict[str, str] | None = None
     ) -> str:
-        """Create the prompt for Claude to analyze scraped articles.
+        """Create the prompt for LLM to analyze scraped articles.
 
         Args:
             articles: List of scraped article dictionaries
+            flair_options: Optional mapping of flair text to template IDs
 
         Returns:
             Formatted prompt string
         """
         today = datetime.datetime.now().strftime("%Y-%m-%d")
 
-        # Prepare article summaries for Claude efficiently
+        # Prepare article summaries efficiently
         article_summaries: list[str] = [
             f"""
 Article {i}:
@@ -154,31 +161,35 @@ Please analyze them and identify the NEWEST and most relevant local news article
 {"".join(article_summaries)}
 
 From these articles, select the most recent and relevant Hudson, Ohio news stories.{flair_section}
-For each selected article, format your response as valid TOML using this EXACT structure:
+For each selected article, format your response as valid JSON using this EXACT structure:
 
-[[news]]
-headline = "story headline"
-summary = "brief 2-3 sentence summary of the article"
-publication_date = "YYYY-MM-DD"
-link = "https://source.com/article"
-{'flair = "category name"' if flair_options else ""}
-
-[[news]]
-headline = "second story headline"
-summary = "second story summary"
-publication_date = "YYYY-MM-DD"
-link = "https://source.com/second-article"
-{'flair = "category name"' if flair_options else ""}
+{{
+  "news": [
+    {{
+      "headline": "story headline",
+      "summary": "brief 2-3 sentence summary of the article",
+      "publication_date": "YYYY-MM-DD",
+      "link": "https://source.com/article"{"," if flair_options else ""}
+      {'      "flair": "category name"' if flair_options else ""}
+    }},
+    {{
+      "headline": "second story headline",
+      "summary": "second story summary",
+      "publication_date": "YYYY-MM-DD",
+      "link": "https://source.com/second-article"{"," if flair_options else ""}
+      {'      "flair": "category name"' if flair_options else ""}
+    }}
+  ]
+}}
 
 IMPORTANT:
 - Only include articles that are clearly about Hudson, Ohio or directly relevant to Hudson residents
 - Prioritize the most recent articles (from today or yesterday)
 - Ensure dates are in YYYY-MM-DD format
 - Write clear, concise summaries that capture the key points
-- Output ONLY the TOML data, no explanatory text
-- If no relevant articles are found, return an empty TOML array like this:
+- Output ONLY the JSON data, no explanatory text
+- If no relevant articles are found, return an empty array: {{"news": []}}
 {"- Assign the most appropriate flair/category from the provided list" if flair_options else ""}
-[[news]]
 """
 
         return prompt
@@ -186,10 +197,13 @@ IMPORTANT:
     def _parse_response(
         self, response: str, flair_mapping: dict[str, str] | None = None
     ) -> NewsCollection:
-        """Parse Claude's response into NewsCollection.
+        """Parse LLM response into NewsCollection.
+
+        Tries JSON first, falls back to TOML if JSON parsing fails.
 
         Args:
-            response: Raw response from Claude
+            response: Raw response from LLM
+            flair_mapping: Optional flair mapping for template IDs
 
         Returns:
             NewsCollection instance
@@ -198,33 +212,117 @@ IMPORTANT:
             ValueError: If response cannot be parsed
         """
         self.logger.debug(f"Parsing response: {response[:200]}...")
+        mapping = flair_mapping or self.flair_mapping
 
+        # Try JSON parsing first
         try:
-            # Extract TOML content from response
-            toml_content = self.extract_toml_from_response(response)
+            json_data = self._extract_json_from_response(response)
+            news_items = self._parse_json_response(json_data, mapping)
+            self.logger.info(
+                f"Successfully parsed {len(news_items)} news items from JSON"
+            )
+            return NewsCollection(news_items)
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            self.logger.debug(f"JSON parsing failed, falling back to TOML: {e}")
 
-            if not toml_content:
-                raise ValueError("No valid TOML content found in response")
+            # Fall back to TOML parsing
+            try:
+                toml_content = self.extract_toml_from_response(response)
 
-            # Validate TOML syntax
-            if not TOMLHandler.validate_toml_syntax(toml_content):
-                raise ValueError("Invalid TOML syntax in response")
+                if not toml_content:
+                    raise ValueError("No valid TOML content found in response")
 
-            # Parse into NewsCollection
-            news_collection = TOMLHandler.parse_news_toml(
-                toml_content, flair_mapping or self.flair_mapping
+                # Validate TOML syntax
+                if not TOMLHandler.validate_toml_syntax(toml_content):
+                    raise ValueError("Invalid TOML syntax in response")
+
+                # Parse into NewsCollection
+                news_collection = TOMLHandler.parse_news_toml(toml_content, mapping)
+
+                self.logger.info(
+                    f"Successfully parsed {len(news_collection)} news items from TOML"
+                )
+                return news_collection
+
+            except Exception as toml_error:
+                self.logger.error(f"Failed to parse response: {toml_error}")
+                self.logger.debug(f"Raw response: {response}")
+                raise ValueError(f"Failed to parse LLM response: {toml_error}")
+
+    def _extract_json_from_response(self, response: str) -> dict[str, Any]:
+        """Extract JSON content from LLM response.
+
+        Args:
+            response: Raw response text
+
+        Returns:
+            Parsed JSON dictionary
+
+        Raises:
+            json.JSONDecodeError: If no valid JSON found
+        """
+        # First try to find JSON in code blocks
+        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", response, re.DOTALL)
+        if json_match:
+            result: dict[str, Any] = json.loads(json_match.group(1))
+            return result
+
+        # Try to parse the entire response as JSON
+        result_full: dict[str, Any] = json.loads(response.strip())
+        return result_full
+
+    def _parse_json_response(
+        self, json_data: dict[str, Any], flair_mapping: dict[str, str]
+    ) -> list[NewsItem]:
+        """Parse JSON data into list of NewsItems.
+
+        Args:
+            json_data: Parsed JSON dictionary
+            flair_mapping: Mapping of flair text to template IDs
+
+        Returns:
+            List of NewsItem objects
+
+        Raises:
+            KeyError: If required fields are missing
+            ValueError: If data is invalid
+        """
+        news_items: list[NewsItem] = []
+        news_array = json_data.get("news", [])
+
+        for item in news_array:
+            # Validate required fields
+            if not all(
+                k in item for k in ["headline", "summary", "publication_date", "link"]
+            ):
+                raise KeyError("Missing required fields in news item")
+
+            # Parse date
+            date_str = item["publication_date"]
+            pub_date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+
+            # Get flair ID if flair text is provided
+            flair_id = None
+            if "flair" in item and item["flair"]:
+                flair_text = item["flair"]
+                flair_id = flair_mapping.get(flair_text)
+                if flair_id is None:
+                    self.logger.warning(f"Flair '{flair_text}' not found in mapping")
+
+            news_items.append(
+                NewsItem(
+                    headline=item["headline"],
+                    summary=item["summary"],
+                    publication_date=pub_date,
+                    link=item["link"],
+                    flair_id=flair_id,
+                )
             )
 
-            self.logger.info(f"Successfully parsed {len(news_collection)} news items")
-            return news_collection
+        return news_items
 
-        except Exception as e:
-            self.logger.error(f"Failed to parse response: {e}")
-            self.logger.debug(f"Raw response: {response}")
-            raise ValueError(f"Failed to parse Claude response: {e}")
-
-    def extract_toml_from_response(self, response: str) -> Optional[str]:
-        """Extract TOML content from Claude's response.
+    def extract_toml_from_response(self, response: str) -> str | None:
+        """Extract TOML content from LLM response.
 
         Args:
             response: Raw response text
@@ -249,7 +347,7 @@ IMPORTANT:
 
 
 async def test_connection() -> bool:
-    """Test connection to Claude SDK.
+    """Test connection to LLM API.
 
     Returns:
         True if connection successful, False otherwise
@@ -258,30 +356,42 @@ async def test_connection() -> bool:
 
     try:
         config = Config()
-        aggregator = NewsAggregator(config)
 
-        logger.info("Testing Claude SDK connection...")
+        logger.info("Testing LLM API connection...")
 
-        async with ClaudeSDKClient(options=aggregator.options) as client:
-            # Simple test query
-            await client.query("Please respond with just 'OK' to confirm connection.")
-            async for message in client.receive_response():
-                text = ""
-                if type(message) is AssistantMessage:
-                    for content in message.content:
-                        if type(content) is TextBlock:
-                            text += content.text
+        # Create OpenAI client
+        api_key = config.perplexity_api_key
+        if not api_key:
+            logger.error("❌ PERPLEXITY_API_KEY not set")
+            return False
 
-                if "OK" in text:
-                    logger.info(f"Claude response: {text}")
-                    logger.info("✅ Claude SDK connection successful")
-                    return True
+        client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=config.llm_base_url,
+            timeout=config.llm_timeout_seconds,
+        )
 
-        logger.warning("⚠️ Claude SDK connection test inconclusive")
+        # Simple test query
+        response = await client.chat.completions.create(
+            model=config.llm_model,
+            messages=[
+                {"role": "user", "content": "Respond with just 'OK'."},
+            ],
+            max_tokens=10,
+        )
+
+        if response.choices and response.choices[0].message.content:
+            text = response.choices[0].message.content
+            if "OK" in text:
+                logger.info(f"LLM response: {text}")
+                logger.info("✅ LLM API connection successful")
+                return True
+
+        logger.warning("⚠️ LLM API connection test inconclusive")
         return False
 
     except Exception:
-        logger.exception("❌ Claude SDK connection failed")
+        logger.exception("❌ LLM API connection failed")
         return False
 
 
@@ -291,7 +401,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="News aggregator CLI")
     parser.add_argument(
-        "--test-connection", action="store_true", help="Test Claude SDK connection"
+        "--test-connection", action="store_true", help="Test LLM API connection"
     )
     parser.add_argument("--config", type=str, help="Path to configuration file")
 

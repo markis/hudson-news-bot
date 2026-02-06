@@ -4,8 +4,6 @@ from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
-from claude_code_sdk import AssistantMessage, TextBlock
-
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.aggregator import NewsAggregator, main
 from hudson_news_bot.news.models import NewsCollection, NewsItem
@@ -20,8 +18,12 @@ class TestNewsAggregator:
         """Create test configuration."""
         config = MagicMock(spec=Config)
         config.system_prompt = "Test system prompt"
-        config.claude_max_turns = 5
         config.max_articles = 10
+        config.perplexity_api_key = "test-api-key"
+        config.llm_base_url = "https://api.test.com"
+        config.llm_timeout_seconds = 30
+        config.llm_model = "test-model"
+        config.llm_max_tokens = 4096
         return config
 
     @pytest.fixture
@@ -35,24 +37,23 @@ class TestNewsAggregator:
 
         assert aggregator.config == config
         assert aggregator.logger.name == "hudson_news_bot.news.aggregator"
-        assert aggregator.options.system_prompt == "Test system prompt"
-        assert aggregator.options.max_turns == 5
-        assert aggregator.options.permission_mode == config.claude_permission_mode
+        assert aggregator.client is not None
 
     def test_config_integration(self) -> None:
         """Test that aggregator properly uses config values."""
         config = MagicMock(spec=Config)
         config.system_prompt = "Custom prompt"
-        config.claude_max_turns = 3
         config.max_articles = 5
+        config.perplexity_api_key = "test-api-key"
+        config.llm_base_url = "https://api.test.com"
+        config.llm_timeout_seconds = 30
+        config.llm_model = "test-model"
+        config.llm_max_tokens = 4096
 
         aggregator = NewsAggregator(config)
 
         assert aggregator.config.system_prompt == "Custom prompt"
-        assert aggregator.config.claude_max_turns == 3
         assert aggregator.config.max_articles == 5
-        assert aggregator.options.system_prompt == "Custom prompt"
-        assert aggregator.options.max_turns == 3
 
 
 class TestMainCLI:
@@ -108,8 +109,13 @@ class TestAggregateNews:
     def config(self) -> Config:
         config = MagicMock(spec=Config)
         config.system_prompt = "Test system prompt"
-        config.claude_max_turns = 5
         config.max_articles = 3
+        config.news_sites = ["https://example.com"]
+        config.perplexity_api_key = "test-api-key"
+        config.llm_base_url = "https://api.test.com"
+        config.llm_timeout_seconds = 30
+        config.llm_model = "test-model"
+        config.llm_max_tokens = 4096
         return config
 
     @pytest.fixture
@@ -117,20 +123,23 @@ class TestAggregateNews:
         return NewsAggregator(config)
 
     @pytest.fixture
-    def sample_toml_response(self) -> str:
-        return """```toml
-[[news]]
-headline = "Hudson Council Approves Budget"
-summary = "The Hudson City Council approved a $50M budget for the upcoming fiscal year."
-publication_date = "2025-08-14"
-link = "https://hudson.com/budget-approval"
-
-[[news]]
-headline = "New Park Opens Downtown"
-summary = "Hudson's newest park featuring walking trails and playground equipment opened to the public."
-publication_date = "2025-08-13"
-link = "https://hudson.com/new-park"
-```"""
+    def sample_json_response(self) -> str:
+        return """{
+  "news": [
+    {
+      "headline": "Hudson Council Approves Budget",
+      "summary": "The Hudson City Council approved a $50M budget for the upcoming fiscal year.",
+      "publication_date": "2025-08-14",
+      "link": "https://hudson.com/budget-approval"
+    },
+    {
+      "headline": "New Park Opens Downtown",
+      "summary": "Hudson's newest park featuring walking trails and playground equipment opened to the public.",
+      "publication_date": "2025-08-13",
+      "link": "https://hudson.com/new-park"
+    }
+  ]
+}"""
 
     @pytest.fixture
     def expected_news_collection(self) -> NewsCollection:
@@ -153,13 +162,11 @@ link = "https://hudson.com/new-park"
 
     @pytest.mark.asyncio
     @patch("hudson_news_bot.news.aggregator.WebsiteScraper")
-    @patch("hudson_news_bot.news.aggregator.ClaudeSDKClient")
     async def test_aggregate_news_success(
         self,
-        mock_claude_client_class: MagicMock,
         mock_scraper_class: MagicMock,
         aggregator: NewsAggregator,
-        sample_toml_response: str,
+        sample_json_response: str,
         expected_news_collection: NewsCollection,
     ) -> None:
         # Mock scraper
@@ -174,29 +181,23 @@ link = "https://hudson.com/new-park"
             }
         ]
 
-        # Mock Claude client
-        mock_client_instance = AsyncMock()
-        mock_claude_client_class.return_value.__aenter__ = AsyncMock(
-            return_value=mock_client_instance
+        # Mock OpenAI client
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = sample_json_response
+
+        aggregator.client.chat.completions.create = AsyncMock(
+            return_value=mock_response
         )
-        mock_claude_client_class.return_value.__aexit__ = AsyncMock(return_value=None)
-
-        mock_message = MagicMock(spec=AssistantMessage)
-        mock_text_block = MagicMock(spec=TextBlock)
-        mock_text_block.text = sample_toml_response
-        mock_message.content = [mock_text_block]
-
-        async def mock_receive_response():
-            yield mock_message
-
-        mock_client_instance.receive_response = mock_receive_response
 
         result = await aggregator.aggregate_news()
 
-        mock_client_instance.query.assert_called_once()
-        query_call = mock_client_instance.query.call_args[0][0]
-        assert "2025-" in query_call
-        assert "Test Article" in query_call
+        aggregator.client.chat.completions.create.assert_called_once()
+        call_args = aggregator.client.chat.completions.create.call_args
+        assert call_args[1]["model"] == "test-model"
+        assert call_args[1]["max_tokens"] == 4096
+        assert len(call_args[1]["messages"]) == 2
+        assert "Test Article" in call_args[1]["messages"][1]["content"]
 
         assert len(result) == 2
         assert result.news[0].headline == expected_news_collection.news[0].headline
@@ -205,10 +206,8 @@ link = "https://hudson.com/new-park"
 
     @pytest.mark.asyncio
     @patch("hudson_news_bot.news.aggregator.WebsiteScraper")
-    @patch("hudson_news_bot.news.aggregator.ClaudeSDKClient")
     async def test_aggregate_news_no_response(
         self,
-        mock_claude_client_class: MagicMock,
         mock_scraper_class: MagicMock,
         aggregator: NewsAggregator,
     ) -> None:
@@ -224,28 +223,22 @@ link = "https://hudson.com/new-park"
             }
         ]
 
-        # Mock Claude client
-        mock_client_instance = AsyncMock()
-        mock_claude_client_class.return_value.__aenter__ = AsyncMock(
-            return_value=mock_client_instance
+        # Mock OpenAI client with no content in response
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = None
+
+        aggregator.client.chat.completions.create = AsyncMock(
+            return_value=mock_response
         )
-        mock_claude_client_class.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        async def mock_receive_response():
-            return
-            yield
-
-        mock_client_instance.receive_response = mock_receive_response
-
-        with pytest.raises(Exception, match="No response received from Claude"):
+        with pytest.raises(Exception, match="No response received from LLM"):
             await aggregator.aggregate_news()
 
     @pytest.mark.asyncio
     @patch("hudson_news_bot.news.aggregator.WebsiteScraper")
-    @patch("hudson_news_bot.news.aggregator.ClaudeSDKClient")
-    async def test_aggregate_news_non_text_response(
+    async def test_aggregate_news_invalid_json(
         self,
-        mock_claude_client_class: MagicMock,
         mock_scraper_class: MagicMock,
         aggregator: NewsAggregator,
     ) -> None:
@@ -261,72 +254,22 @@ link = "https://hudson.com/new-park"
             }
         ]
 
-        # Mock Claude client
-        mock_client_instance = AsyncMock()
-        mock_claude_client_class.return_value.__aenter__ = AsyncMock(
-            return_value=mock_client_instance
+        # Mock OpenAI client with invalid JSON
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = '{"news": [{"headline": '
+
+        aggregator.client.chat.completions.create = AsyncMock(
+            return_value=mock_response
         )
-        mock_claude_client_class.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        mock_message = MagicMock(spec=AssistantMessage)
-        mock_non_text_block = MagicMock()
-        mock_message.content = [mock_non_text_block]
-
-        async def mock_receive_response():
-            yield mock_message
-
-        mock_client_instance.receive_response = mock_receive_response
-
-        with pytest.raises(Exception, match="No response received from Claude"):
+        with pytest.raises(ValueError, match="Failed to parse LLM response"):
             await aggregator.aggregate_news()
 
     @pytest.mark.asyncio
     @patch("hudson_news_bot.news.aggregator.WebsiteScraper")
-    @patch("hudson_news_bot.news.aggregator.ClaudeSDKClient")
-    async def test_aggregate_news_invalid_toml(
+    async def test_aggregate_news_toml_fallback(
         self,
-        mock_claude_client_class: MagicMock,
-        mock_scraper_class: MagicMock,
-        aggregator: NewsAggregator,
-    ) -> None:
-        # Mock scraper
-        mock_scraper_instance = AsyncMock()
-        mock_scraper_class.return_value = mock_scraper_instance
-        mock_scraper_instance.hudson.return_value = [
-            {
-                "url": "https://hudson.com/article1",
-                "headline": "Test Article",
-                "date": "2025-08-14",
-                "content": "Test content",
-            }
-        ]
-
-        # Mock Claude client
-        mock_client_instance = AsyncMock()
-        mock_claude_client_class.return_value.__aenter__ = AsyncMock(
-            return_value=mock_client_instance
-        )
-        mock_claude_client_class.return_value.__aexit__ = AsyncMock(return_value=None)
-
-        mock_message = MagicMock(spec=AssistantMessage)
-        mock_text_block = MagicMock(spec=TextBlock)
-        mock_text_block.text = "```toml\n[[news]]\nheadline = \n```"
-        mock_message.content = [mock_text_block]
-
-        async def mock_receive_response():
-            yield mock_message
-
-        mock_client_instance.receive_response = mock_receive_response
-
-        with pytest.raises(ValueError, match="Failed to parse Claude response"):
-            await aggregator.aggregate_news()
-
-    @pytest.mark.asyncio
-    @patch("hudson_news_bot.news.aggregator.WebsiteScraper")
-    @patch("hudson_news_bot.news.aggregator.ClaudeSDKClient")
-    async def test_aggregate_news_no_toml_content(
-        self,
-        mock_claude_client_class: MagicMock,
         mock_scraper_class: MagicMock,
         aggregator: NewsAggregator,
     ) -> None:
@@ -342,24 +285,58 @@ link = "https://hudson.com/new-park"
             }
         ]
 
-        # Mock Claude client
-        mock_client_instance = AsyncMock()
-        mock_claude_client_class.return_value.__aenter__ = AsyncMock(
-            return_value=mock_client_instance
+        # Mock OpenAI client with TOML response (fallback)
+        toml_response = """```toml
+[[news]]
+headline = "Hudson Council Approves Budget"
+summary = "The Hudson City Council approved a $50M budget."
+publication_date = "2025-08-14"
+link = "https://hudson.com/budget-approval"
+```"""
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = toml_response
+
+        aggregator.client.chat.completions.create = AsyncMock(
+            return_value=mock_response
         )
-        mock_claude_client_class.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        mock_message = MagicMock(spec=AssistantMessage)
-        mock_text_block = MagicMock(spec=TextBlock)
-        mock_text_block.text = "Sorry, I couldn't find any news articles today."
-        mock_message.content = [mock_text_block]
+        result = await aggregator.aggregate_news()
 
-        async def mock_receive_response():
-            yield mock_message
+        assert len(result) == 1
+        assert result.news[0].headline == "Hudson Council Approves Budget"
 
-        mock_client_instance.receive_response = mock_receive_response
+    @pytest.mark.asyncio
+    @patch("hudson_news_bot.news.aggregator.WebsiteScraper")
+    async def test_aggregate_news_no_parseable_content(
+        self,
+        mock_scraper_class: MagicMock,
+        aggregator: NewsAggregator,
+    ) -> None:
+        # Mock scraper
+        mock_scraper_instance = AsyncMock()
+        mock_scraper_class.return_value = mock_scraper_instance
+        mock_scraper_instance.scrape_news_sites.return_value = [
+            {
+                "url": "https://hudson.com/article1",
+                "headline": "Test Article",
+                "date": "2025-08-14",
+                "content": "Test content",
+            }
+        ]
 
-        with pytest.raises(ValueError, match="No valid TOML content found in response"):
+        # Mock OpenAI client with unparseable response
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[
+            0
+        ].message.content = "Sorry, I couldn't find any news articles today."
+
+        aggregator.client.chat.completions.create = AsyncMock(
+            return_value=mock_response
+        )
+
+        with pytest.raises(ValueError, match="Failed to parse LLM response"):
             await aggregator.aggregate_news()
 
 
@@ -370,8 +347,12 @@ class TestResponseParsing:
     def aggregator(self) -> NewsAggregator:
         config = MagicMock(spec=Config)
         config.system_prompt = "Test"
-        config.claude_max_turns = 5
         config.max_articles = 10
+        config.perplexity_api_key = "test-api-key"
+        config.llm_base_url = "https://api.test.com"
+        config.llm_timeout_seconds = 30
+        config.llm_model = "test-model"
+        config.llm_max_tokens = 4096
         return NewsAggregator(config)
 
     def test_extract_toml_from_response_with_code_block(

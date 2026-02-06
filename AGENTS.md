@@ -4,7 +4,7 @@ This file provides guidance for AI coding agents (like Claude Code) working in t
 
 ## Project Overview
 
-Hudson News Bot is a Python 3.12+ news aggregation bot that scrapes Hudson, Ohio news sites, uses Claude SDK for intelligent content analysis, and posts to Reddit with deduplication. Key technologies: `asyncio`, `asyncpraw`, `playwright`, `claude-code-sdk`.
+Hudson News Bot is a Python 3.12+ news aggregation bot that scrapes Hudson, Ohio news sites, uses LLM API (Perplexity) for intelligent content analysis, and posts to Reddit with deduplication. Key technologies: `asyncio`, `asyncpraw`, `playwright`, `openai` (AsyncOpenAI client).
 
 ## Build System & Dependencies
 
@@ -118,7 +118,7 @@ from typing import Any, Final
 
 # Third-party packages (alphabetical)
 from asyncpraw import Reddit
-from claude_code_sdk import ClaudeSDKClient
+from openai import AsyncOpenAI
 
 # Local modules (absolute imports, alphabetical)
 from hudson_news_bot.config.settings import Config
@@ -229,12 +229,15 @@ async def fetch_news(url: str) -> dict[str, Any]:
             return await response.json()
 
 # Async iteration
-async for message in client.receive_response():
-    process_message(message)
+async for item in async_generator():
+    process_item(item)
 
-# Context managers
-async with ClaudeSDKClient(options=options) as client:
-    await client.query(prompt)
+# Async API calls
+client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+response = await client.chat.completions.create(
+    model="model-name",
+    messages=[{"role": "user", "content": "prompt"}],
+)
 
 # Cleanup in finally blocks
 try:
