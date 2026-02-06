@@ -6,7 +6,7 @@ from hudson_news_bot.config.settings import (
     ConfigDict,
     NewsConfig,
     RedditConfig,
-    ClaudeConfig,
+    LLMConfig,
     DatabaseConfig,
     DEFAULT_CONFIG,
 )
@@ -18,12 +18,12 @@ def test_config_dict_structure():
 
     assert "news" in hints
     assert "reddit" in hints
-    assert "claude" in hints
+    assert "llm" in hints
     assert "database" in hints
 
     assert hints["news"] == NewsConfig
     assert hints["reddit"] == RedditConfig
-    assert hints["claude"] == ClaudeConfig
+    assert hints["llm"] == LLMConfig
     assert hints["database"] == DatabaseConfig
 
 
@@ -55,17 +55,19 @@ def test_reddit_config_structure():
     assert hints["max_search_results"] is int
 
 
-def test_claude_config_structure():
-    """Test that ClaudeConfig has the expected fields."""
-    hints = get_type_hints(ClaudeConfig)
+def test_llm_config_structure():
+    """Test that LLMConfig has the expected fields."""
+    hints = get_type_hints(LLMConfig)
 
-    assert "max_turns" in hints
-    assert "permission_mode" in hints
+    assert "model" in hints
+    assert "max_tokens" in hints
     assert "timeout_seconds" in hints
+    assert "base_url" in hints
 
-    assert hints["max_turns"] is int
-    assert hints["permission_mode"] is str
+    assert hints["model"] is str
+    assert hints["max_tokens"] is int
     assert hints["timeout_seconds"] is int
+    # base_url is NotRequired[str], so it should be present in hints
 
 
 def test_database_config_structure():
@@ -81,7 +83,7 @@ def test_default_config_matches_typeddict():
     # This test verifies that DEFAULT_CONFIG has all required keys
     assert "news" in DEFAULT_CONFIG
     assert "reddit" in DEFAULT_CONFIG
-    assert "claude" in DEFAULT_CONFIG
+    assert "llm" in DEFAULT_CONFIG
     assert "database" in DEFAULT_CONFIG
 
     # Check news config
@@ -102,13 +104,15 @@ def test_default_config_matches_typeddict():
     assert isinstance(DEFAULT_CONFIG["reddit"]["check_for_duplicates"], bool)
     assert isinstance(DEFAULT_CONFIG["reddit"]["max_search_results"], int)
 
-    # Check claude config
-    assert "max_turns" in DEFAULT_CONFIG["claude"]
-    assert "permission_mode" in DEFAULT_CONFIG["claude"]
-    assert "timeout_seconds" in DEFAULT_CONFIG["claude"]
-    assert isinstance(DEFAULT_CONFIG["claude"]["max_turns"], int)
-    assert isinstance(DEFAULT_CONFIG["claude"]["permission_mode"], str)
-    assert isinstance(DEFAULT_CONFIG["claude"]["timeout_seconds"], int)
+    # Check llm config
+    assert "model" in DEFAULT_CONFIG["llm"]
+    assert "max_tokens" in DEFAULT_CONFIG["llm"]
+    assert "timeout_seconds" in DEFAULT_CONFIG["llm"]
+    assert "base_url" in DEFAULT_CONFIG["llm"]
+    assert isinstance(DEFAULT_CONFIG["llm"]["model"], str)
+    assert isinstance(DEFAULT_CONFIG["llm"]["max_tokens"], int)
+    assert isinstance(DEFAULT_CONFIG["llm"]["timeout_seconds"], int)
+    assert isinstance(DEFAULT_CONFIG["llm"]["base_url"], str)
 
     # Check database config
     assert "path" in DEFAULT_CONFIG["database"]

@@ -28,11 +28,11 @@ user_agent = "hudson-news-bot/0.1.0"
 check_for_duplicates = true
 max_search_results = 100
 
-[claude]
-max_turns = 10
-permission_mode = "plan"
+[llm]
+model = "sonar-pro"
+max_tokens = 4096
 timeout_seconds = 300
-model = "claude-sonnet-4-20250514"
+# base_url = "https://api.perplexity.ai"  # default, uncomment to override
 
 [database]
 path = "data/submissions.db"

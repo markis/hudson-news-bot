@@ -24,10 +24,11 @@ user_agent = "test-bot/1.0"
 check_for_duplicates = false
 max_search_results = 50
 
-[claude]
-max_turns = 5
-permission_mode = "readWrite"
+[llm]
+max_tokens = 8192
 timeout_seconds = 600
+model = "sonar-reasoning"
+base_url = "https://api.perplexity.ai"
 
 [database]
 path = "test.db"
@@ -46,9 +47,10 @@ path = "test.db"
                 assert config.reddit_user_agent == "test-bot/1.0"
                 assert config.check_for_duplicates is False
                 assert config.max_search_results == 50
-                assert config.claude_max_turns == 5
-                assert config.claude_permission_mode == "readWrite"
-                assert config.claude_timeout_seconds == 600
+                assert config.llm_max_tokens == 8192
+                assert config.llm_timeout_seconds == 600
+                assert config.llm_model == "sonar-reasoning"
+                assert config.llm_base_url == "https://api.perplexity.ai"
                 assert config.database_path == "test.db"
             finally:
                 Path(f.name).unlink()
@@ -73,9 +75,10 @@ system_prompt = "Test prompt"
                 assert config.reddit_user_agent == "hudson-news-bot/0.1.0"
                 assert config.check_for_duplicates is True
                 assert config.max_search_results == 100
-                assert config.claude_max_turns == 3
-                assert config.claude_permission_mode == "plan"
-                assert config.claude_timeout_seconds == 300
+                assert config.llm_max_tokens == 4096
+                assert config.llm_timeout_seconds == 300
+                assert config.llm_model == "sonar-pro"
+                assert config.llm_base_url == "https://api.perplexity.ai"
                 assert config.database_path == "data/submissions.db"
             finally:
                 Path(f.name).unlink()
@@ -87,7 +90,7 @@ system_prompt = "Test prompt"
             "REDDIT_CLIENT_SECRET": "test_client_secret",
             "REDDIT_USERNAME": "test_user",
             "REDDIT_PASSWORD": "test_pass",
-            "ANTHROPIC_API_KEY": "test_api_key",
+            "PERPLEXITY_API_KEY": "test_api_key",
         },
     )
     def test_environment_variables(self) -> None:
@@ -108,7 +111,7 @@ system_prompt = "Test prompt"
                 assert config.reddit_client_secret == "test_client_secret"
                 assert config.reddit_username == "test_user"
                 assert config.reddit_password == "test_pass"
-                assert config.anthropic_api_key == "test_api_key"
+                assert config.perplexity_api_key == "test_api_key"
             finally:
                 Path(f.name).unlink()
 
@@ -140,7 +143,7 @@ system_prompt = "Test prompt"
         {
             "REDDIT_CLIENT_ID": "test_client_id",
             "REDDIT_CLIENT_SECRET": "test_client_secret",
-            "ANTHROPIC_API_KEY": "test_api_key",
+            "PERPLEXITY_API_KEY": "test_api_key",
         },
     )
     def test_validation_success(self) -> None:

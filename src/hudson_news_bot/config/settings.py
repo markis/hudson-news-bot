@@ -7,8 +7,6 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any, Final, NotRequired, TypedDict, cast
 
-from claude_code_sdk import PermissionMode
-
 from hudson_news_bot.utils.toml_handler import TOMLHandler
 
 
@@ -31,13 +29,13 @@ class RedditConfig(TypedDict):
     max_search_results: int
 
 
-class ClaudeConfig(TypedDict):
-    """Configuration for Claude SDK."""
+class LLMConfig(TypedDict):
+    """Configuration for LLM API."""
 
-    max_turns: int
-    permission_mode: str
+    model: str
+    max_tokens: int
     timeout_seconds: int
-    model: NotRequired[str]
+    base_url: NotRequired[str]
 
 
 class DatabaseConfig(TypedDict):
@@ -51,7 +49,7 @@ class ConfigDict(TypedDict):
 
     news: NewsConfig
     reddit: RedditConfig
-    claude: ClaudeConfig
+    llm: LLMConfig
     database: DatabaseConfig
 
 
@@ -110,10 +108,11 @@ DEFAULT_CONFIG: Final[ConfigDict] = {
         "check_for_duplicates": True,
         "max_search_results": 100,
     },
-    "claude": {
-        "max_turns": 3,
-        "permission_mode": "plan",
+    "llm": {
+        "model": "sonar-pro",
+        "max_tokens": 4096,
         "timeout_seconds": 300,
+        "base_url": "https://api.perplexity.ai",
     },
     "database": {"path": "data/submissions.db"},
 }
@@ -160,7 +159,7 @@ class Config:
 
     @cached_property
     def system_prompt(self) -> str:
-        """Get Claude system prompt for news aggregation."""
+        """Get LLM system prompt for news aggregation."""
         return str(self._data.get("news", {}).get("system_prompt", ""))
 
     @cached_property
@@ -181,27 +180,26 @@ class Config:
         return int(self._data.get("reddit", {}).get("max_search_results", 100))
 
     @cached_property
-    def claude_max_turns(self) -> int:
-        """Maximum turns for Claude conversation."""
-        return int(self._data.get("claude", {}).get("max_turns", 3))
+    def llm_model(self) -> str:
+        """LLM model name."""
+        return str(self._data.get("llm", {}).get("model", "sonar-pro"))
 
     @cached_property
-    def claude_model(self) -> str | None:
-        """Maximum turns for Claude conversation."""
-        return self._data.get("claude", {}).get("model")
+    def llm_max_tokens(self) -> int:
+        """Maximum tokens for LLM response."""
+        return int(self._data.get("llm", {}).get("max_tokens", 4096))
 
     @cached_property
-    def claude_permission_mode(self) -> PermissionMode:
-        """Claude permission mode."""
-        return cast(
-            PermissionMode,
-            self._data.get("claude", {}).get("permission_mode", "plan"),
+    def llm_timeout_seconds(self) -> int:
+        """LLM request timeout in seconds."""
+        return int(self._data.get("llm", {}).get("timeout_seconds", 300))
+
+    @cached_property
+    def llm_base_url(self) -> str:
+        """LLM API base URL."""
+        return str(
+            self._data.get("llm", {}).get("base_url", "https://api.perplexity.ai")
         )
-
-    @cached_property
-    def claude_timeout_seconds(self) -> int:
-        """Claude request timeout in seconds."""
-        return int(self._data.get("claude", {}).get("timeout_seconds", 300))
 
     @cached_property
     def database_path(self) -> str:
@@ -226,9 +224,9 @@ class Config:
         return sites
 
     @cached_property
-    def anthropic_api_key(self) -> str | None:
-        """Get Anthropic API key from environment."""
-        return os.getenv("ANTHROPIC_API_KEY")
+    def perplexity_api_key(self) -> str | None:
+        """Get Perplexity API key from environment."""
+        return os.getenv("PERPLEXITY_API_KEY")
 
     @cached_property
     def reddit_client_id(self) -> str | None:
