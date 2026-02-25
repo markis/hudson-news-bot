@@ -2,20 +2,38 @@
 
 import asyncio
 import datetime
-import json
 from logging import Logger
 import logging
-import re
 import sys
-from typing import Any, Final
+from typing import Final
 
 from openai import AsyncOpenAI
+from pydantic import BaseModel, Field
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsCollection, NewsItem
 from hudson_news_bot.news.scraper import NewsItemDict, WebsiteScraper
 from hudson_news_bot.reddit.client import RedditClient
-from hudson_news_bot.utils.toml_handler import TOMLHandler
+
+
+class NewsItemResponse(BaseModel):
+    """Pydantic model for structured LLM response - single news item."""
+
+    headline: str = Field(description="Story headline")
+    summary: str = Field(description="Brief 2-3 sentence summary of the article")
+    publication_date: str = Field(description="Publication date in YYYY-MM-DD format")
+    link: str = Field(description="Full URL to the article")
+    flair: str | None = Field(
+        default=None, description="Category/flair from the provided list"
+    )
+
+
+class NewsResponse(BaseModel):
+    """Pydantic model for structured LLM response - collection of news items."""
+
+    news: list[NewsItemResponse] = Field(
+        description="List of relevant Hudson, Ohio news articles"
+    )
 
 
 class NewsAggregator:
@@ -90,9 +108,9 @@ class NewsAggregator:
             except Exception as e:
                 self.logger.warning(f"Could not get flair options: {e}")
 
-        # Send scraped content to LLM for analysis
+        # Send scraped content to LLM for analysis with structured output
         prompt = self.create_analysis_prompt(articles, flair_options)
-        self.logger.debug("Sending analysis prompt to LLM")
+        self.logger.debug("Sending analysis prompt to LLM with structured output")
 
         try:
             response = await self.client.chat.completions.create(
@@ -102,16 +120,20 @@ class NewsAggregator:
                     {"role": "user", "content": prompt},
                 ],
                 max_tokens=self.config.llm_max_tokens,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "hudson_news_response",
+                        "schema": NewsResponse.model_json_schema(),
+                    },
+                },
             )
 
-            # Extract response content
+            # Parse structured response
             if response.choices and response.choices[0].message.content:
                 response_text = response.choices[0].message.content
-                return self._parse_response(response_text)
+                return self._parse_structured_response(response_text)
 
-        except ValueError:
-            # Re-raise parsing errors as-is
-            raise
         except Exception as e:
             self.logger.error(f"LLM API request failed: {e}")
             raise Exception(f"LLM API request failed: {e}")
@@ -194,16 +216,11 @@ IMPORTANT:
 
         return prompt
 
-    def _parse_response(
-        self, response: str, flair_mapping: dict[str, str] | None = None
-    ) -> NewsCollection:
-        """Parse LLM response into NewsCollection.
-
-        Tries JSON first, falls back to TOML if JSON parsing fails.
+    def _parse_structured_response(self, response: str) -> NewsCollection:
+        """Parse structured LLM response into NewsCollection.
 
         Args:
-            response: Raw response from LLM
-            flair_mapping: Optional flair mapping for template IDs
+            response: Structured JSON response from LLM
 
         Returns:
             NewsCollection instance
@@ -211,139 +228,46 @@ IMPORTANT:
         Raises:
             ValueError: If response cannot be parsed
         """
-        self.logger.debug(f"Parsing response: {response[:200]}...")
-        mapping = flair_mapping or self.flair_mapping
+        self.logger.debug(f"Parsing structured response: {response[:200]}...")
 
-        # Try JSON parsing first
         try:
-            json_data = self._extract_json_from_response(response)
-            news_items = self._parse_json_response(json_data, mapping)
+            # Parse with Pydantic model
+            news_response = NewsResponse.model_validate_json(response)
+
+            # Convert to NewsItem objects
+            news_items: list[NewsItem] = []
+            for item in news_response.news:
+                # Parse date
+                pub_date = datetime.datetime.strptime(item.publication_date, "%Y-%m-%d")
+
+                # Get flair ID if flair text is provided
+                flair_id = None
+                if item.flair:
+                    flair_id = self.flair_mapping.get(item.flair)
+                    if flair_id is None:
+                        self.logger.warning(
+                            f"Flair '{item.flair}' not found in mapping"
+                        )
+
+                news_items.append(
+                    NewsItem(
+                        headline=item.headline,
+                        summary=item.summary,
+                        publication_date=pub_date,
+                        link=item.link,
+                        flair_id=flair_id,
+                    )
+                )
+
             self.logger.info(
-                f"Successfully parsed {len(news_items)} news items from JSON"
+                f"Successfully parsed {len(news_items)} news items from structured output"
             )
             return NewsCollection(news_items)
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            self.logger.debug(f"JSON parsing failed, falling back to TOML: {e}")
 
-            # Fall back to TOML parsing
-            try:
-                toml_content = self.extract_toml_from_response(response)
-
-                if not toml_content:
-                    raise ValueError("No valid TOML content found in response")
-
-                # Validate TOML syntax
-                if not TOMLHandler.validate_toml_syntax(toml_content):
-                    raise ValueError("Invalid TOML syntax in response")
-
-                # Parse into NewsCollection
-                news_collection = TOMLHandler.parse_news_toml(toml_content, mapping)
-
-                self.logger.info(
-                    f"Successfully parsed {len(news_collection)} news items from TOML"
-                )
-                return news_collection
-
-            except Exception as toml_error:
-                self.logger.error(f"Failed to parse response: {toml_error}")
-                self.logger.debug(f"Raw response: {response}")
-                raise ValueError(f"Failed to parse LLM response: {toml_error}")
-
-    def _extract_json_from_response(self, response: str) -> dict[str, Any]:
-        """Extract JSON content from LLM response.
-
-        Args:
-            response: Raw response text
-
-        Returns:
-            Parsed JSON dictionary
-
-        Raises:
-            json.JSONDecodeError: If no valid JSON found
-        """
-        # First try to find JSON in code blocks
-        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", response, re.DOTALL)
-        if json_match:
-            result: dict[str, Any] = json.loads(json_match.group(1))
-            return result
-
-        # Try to parse the entire response as JSON
-        result_full: dict[str, Any] = json.loads(response.strip())
-        return result_full
-
-    def _parse_json_response(
-        self, json_data: dict[str, Any], flair_mapping: dict[str, str]
-    ) -> list[NewsItem]:
-        """Parse JSON data into list of NewsItems.
-
-        Args:
-            json_data: Parsed JSON dictionary
-            flair_mapping: Mapping of flair text to template IDs
-
-        Returns:
-            List of NewsItem objects
-
-        Raises:
-            KeyError: If required fields are missing
-            ValueError: If data is invalid
-        """
-        news_items: list[NewsItem] = []
-        news_array = json_data.get("news", [])
-
-        for item in news_array:
-            # Validate required fields
-            if not all(
-                k in item for k in ["headline", "summary", "publication_date", "link"]
-            ):
-                raise KeyError("Missing required fields in news item")
-
-            # Parse date
-            date_str = item["publication_date"]
-            pub_date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
-
-            # Get flair ID if flair text is provided
-            flair_id = None
-            if "flair" in item and item["flair"]:
-                flair_text = item["flair"]
-                flair_id = flair_mapping.get(flair_text)
-                if flair_id is None:
-                    self.logger.warning(f"Flair '{flair_text}' not found in mapping")
-
-            news_items.append(
-                NewsItem(
-                    headline=item["headline"],
-                    summary=item["summary"],
-                    publication_date=pub_date,
-                    link=item["link"],
-                    flair_id=flair_id,
-                )
-            )
-
-        return news_items
-
-    def extract_toml_from_response(self, response: str) -> str | None:
-        """Extract TOML content from LLM response.
-
-        Args:
-            response: Raw response text
-
-        Returns:
-            Extracted TOML content or None if not found
-        """
-        # First check for direct pattern that indicates TOML content
-        if "[[news]]" in response:
-            # Check for TOML code blocks first
-            toml_match = re.search(
-                r"```(?:toml)?\s*((?:\[\[news\]\].*?))```", response, re.DOTALL
-            )
-            if toml_match:
-                return toml_match.group(1).strip()
-
-            # Fallback: extract from first [[news]] occurrence
-            start_idx = response.find("[[news]]")
-            return response[start_idx:].strip()
-
-        return None
+        except Exception as e:
+            self.logger.error(f"Failed to parse structured response: {e}")
+            self.logger.debug(f"Raw response: {response}")
+            raise ValueError(f"Failed to parse structured LLM response: {e}")
 
 
 async def test_connection() -> bool:

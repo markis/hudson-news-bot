@@ -254,7 +254,7 @@ class TestAggregateNews:
             }
         ]
 
-        # Mock OpenAI client with invalid JSON
+        # Mock OpenAI client with invalid JSON (incomplete)
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = '{"news": [{"headline": '
@@ -263,12 +263,12 @@ class TestAggregateNews:
             return_value=mock_response
         )
 
-        with pytest.raises(ValueError, match="Failed to parse LLM response"):
+        with pytest.raises(Exception, match="LLM API request failed"):
             await aggregator.aggregate_news()
 
     @pytest.mark.asyncio
     @patch("hudson_news_bot.news.aggregator.WebsiteScraper")
-    async def test_aggregate_news_toml_fallback(
+    async def test_aggregate_news_with_flair(
         self,
         mock_scraper_class: MagicMock,
         aggregator: NewsAggregator,
@@ -285,17 +285,22 @@ class TestAggregateNews:
             }
         ]
 
-        # Mock OpenAI client with TOML response (fallback)
-        toml_response = """```toml
-[[news]]
-headline = "Hudson Council Approves Budget"
-summary = "The Hudson City Council approved a $50M budget."
-publication_date = "2025-08-14"
-link = "https://hudson.com/budget-approval"
-```"""
+        # Set up flair mapping
+        aggregator.flair_mapping = {"Local News": "flair-template-123"}
+
+        # Mock OpenAI client with structured JSON response including flair
+        json_response = """{
+  "news": [{
+    "headline": "Hudson Council Approves Budget",
+    "summary": "The Hudson City Council approved a $50M budget.",
+    "publication_date": "2025-08-14",
+    "link": "https://hudson.com/budget-approval",
+    "flair": "Local News"
+  }]
+}"""
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = toml_response
+        mock_response.choices[0].message.content = json_response
 
         aggregator.client.chat.completions.create = AsyncMock(
             return_value=mock_response
@@ -305,10 +310,11 @@ link = "https://hudson.com/budget-approval"
 
         assert len(result) == 1
         assert result.news[0].headline == "Hudson Council Approves Budget"
+        assert result.news[0].flair_id == "flair-template-123"
 
     @pytest.mark.asyncio
     @patch("hudson_news_bot.news.aggregator.WebsiteScraper")
-    async def test_aggregate_news_no_parseable_content(
+    async def test_aggregate_news_empty_results(
         self,
         mock_scraper_class: MagicMock,
         aggregator: NewsAggregator,
@@ -325,19 +331,18 @@ link = "https://hudson.com/budget-approval"
             }
         ]
 
-        # Mock OpenAI client with unparseable response
+        # Mock OpenAI client with empty news array (valid JSON, no results)
+        json_response = '{"news": []}'
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[
-            0
-        ].message.content = "Sorry, I couldn't find any news articles today."
+        mock_response.choices[0].message.content = json_response
 
         aggregator.client.chat.completions.create = AsyncMock(
             return_value=mock_response
         )
 
-        with pytest.raises(ValueError, match="Failed to parse LLM response"):
-            await aggregator.aggregate_news()
+        result = await aggregator.aggregate_news()
+        assert len(result) == 0
 
 
 class TestResponseParsing:
@@ -354,48 +359,6 @@ class TestResponseParsing:
         config.llm_model = "test-model"
         config.llm_max_tokens = 4096
         return NewsAggregator(config)
-
-    def test_extract_toml_from_response_with_code_block(
-        self, aggregator: NewsAggregator
-    ) -> None:
-        response = """Here are the news articles:
-
-```toml
-[[news]]
-headline = "Test Article"
-summary = "Test summary"
-publication_date = "2025-08-14"
-link = "https://example.com"
-```
-
-Let me know if you need more information."""
-
-        result = aggregator.extract_toml_from_response(response)
-        assert result is not None
-        assert "[[news]]" in result
-        assert "Test Article" in result
-
-    def test_extract_toml_from_response_without_code_block(
-        self, aggregator: NewsAggregator
-    ) -> None:
-        response = """[[news]]
-headline = "Test Article"
-summary = "Test summary"
-publication_date = "2025-08-14"
-link = "https://example.com"
-
-Additional text after TOML"""
-
-        result = aggregator.extract_toml_from_response(response)
-        assert result is not None
-        assert result.startswith("[[news]]")
-
-    def test_extract_toml_from_response_no_toml(
-        self, aggregator: NewsAggregator
-    ) -> None:
-        response = "Sorry, I couldn't find any news articles today."
-        result = aggregator.extract_toml_from_response(response)
-        assert result is None
 
     def test_create_analysis_prompt(self, aggregator: NewsAggregator) -> None:
         articles: list[NewsItemDict] = [
