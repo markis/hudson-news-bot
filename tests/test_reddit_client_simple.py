@@ -143,28 +143,6 @@ class TestRedditClient:
         assert results == mock_submissions
 
     @pytest.mark.asyncio
-    @patch.object(RedditClient, "_get_subreddit")
-    async def test_get_recent_submissions_success(
-        self, mock_get_subreddit: AsyncMock
-    ) -> None:
-        """Test successful recent submissions retrieval."""
-        mock_subreddit = MagicMock()
-        mock_submissions = [MagicMock(), MagicMock()]
-
-        # Create an async iterator mock
-        async def async_iter():
-            for submission in mock_submissions:
-                yield submission
-
-        mock_subreddit.new.return_value = async_iter()
-        mock_get_subreddit.return_value = mock_subreddit
-
-        client = RedditClient(self.mock_config)
-        results = await client.get_recent_submissions(limit=25)
-
-        assert results == mock_submissions
-
-    @pytest.mark.asyncio
     @patch.object(RedditClient, "_get_reddit_instance")
     @patch.object(RedditClient, "_get_subreddit")
     async def test_test_connection_success(

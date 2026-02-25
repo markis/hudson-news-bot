@@ -55,11 +55,3 @@ class NewsCollection:
     def __iter__(self) -> Iterator[NewsItem]:
         """Make collection iterable."""
         yield from self.news
-
-    def add_item(self, item: NewsItem) -> None:
-        """Add a news item to the collection."""
-        self.news.append(item)
-
-    def get_urls(self) -> set[str]:
-        """Get all unique URLs from the collection."""
-        return {item.link for item in self.news}

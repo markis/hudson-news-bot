@@ -48,7 +48,6 @@ class TestNewsCollection:
 
         assert len(collection) == 0
         assert list(collection) == []
-        assert collection.get_urls() == set()
 
     def test_collection_with_items(self) -> None:
         """Test collection with news items."""
@@ -71,20 +70,6 @@ class TestNewsCollection:
 
         assert len(collection) == 2
         assert list(collection) == items
-        assert collection.get_urls() == {
-            "https://example.com/1",
-            "https://example.com/2",
-        }
-
-    def test_add_item(self) -> None:
-        """Test adding items to collection."""
-        collection = NewsCollection(news=[])
-        item = NewsItem("Test", "Summary", datetime(2025, 8, 12), "https://example.com")
-
-        collection.add_item(item)
-
-        assert len(collection) == 1
-        assert list(collection)[0] == item
 
     def test_to_toml_string(self) -> None:
         """Test TOML string conversion."""

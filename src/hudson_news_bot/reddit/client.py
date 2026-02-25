@@ -215,28 +215,6 @@ class RedditClient:
             self.logger.exception("Error searching Reddit")
             return []
 
-    async def get_recent_submissions(self, limit: int = 100) -> list[Submission]:
-        """Get recent submissions from the subreddit.
-
-        Args:
-            limit: Maximum number of submissions to retrieve
-
-        Returns:
-            List of recent submissions
-        """
-        subreddit = await self._get_subreddit()
-
-        try:
-            submissions = [
-                submission async for submission in subreddit.new(limit=limit)
-            ]
-            self.logger.debug(f"Retrieved {len(submissions)} recent submissions")
-            return submissions
-
-        except Exception:
-            self.logger.exception("Error getting recent submissions")
-            return []
-
     async def get_user_submissions(self, limit: int = 100) -> list[Submission]:
         """Get recent submissions from the authenticated user.
 
