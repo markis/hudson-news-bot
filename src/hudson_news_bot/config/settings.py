@@ -109,10 +109,10 @@ DEFAULT_CONFIG: Final[ConfigDict] = {
         "max_search_results": 100,
     },
     "llm": {
-        "model": "claude-haiku-3-5",
+        "model": "minimax-m2.5-free",
         "max_tokens": 4096,
         "timeout_seconds": 300,
-        "base_url": "https://opencode.ai/zen/v1/chat/completions",
+        "base_url": "https://opencode.ai/zen/v1",
     },
     "database": {"path": "data/submissions.db"},
 }
