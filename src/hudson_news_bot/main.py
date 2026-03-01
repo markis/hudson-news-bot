@@ -88,6 +88,11 @@ class NewsBot:
                 f"Successfully aggregated {len(news_collection)} news items"
             )
 
+            # Log breakdown of aggregated items
+            for idx, item in enumerate(news_collection, 1):
+                date_str = item.publication_date.strftime("%Y-%m-%d %H:%M:%S")
+                self.logger.info(f"  [{idx}] {date_str} - {item.link}")
+
             # Step 3: Save to file if requested
             if output_file:
                 self.logger.info(f"Saving news items to {output_file}")
