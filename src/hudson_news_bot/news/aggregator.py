@@ -56,10 +56,10 @@ class NewsAggregator:
         self.flair_mapping: dict[str, str] = {}
 
         # Configure OpenAI client for analyzing scraped content
-        api_key = config.perplexity_api_key
+        api_key = config.llm_api_key
         if not api_key or not api_key.strip():
             raise ValueError(
-                "PERPLEXITY_API_KEY environment variable is required and must not be empty"
+                "LLM_API_KEY or PERPLEXITY_API_KEY environment variable is required and must not be empty"
             )
 
         self.client = AsyncOpenAI(
@@ -284,9 +284,9 @@ async def test_connection() -> bool:
         logger.info("Testing LLM API connection...")
 
         # Create OpenAI client
-        api_key = config.perplexity_api_key
+        api_key = config.llm_api_key
         if not api_key:
-            logger.error("❌ PERPLEXITY_API_KEY not set")
+            logger.error("❌ LLM_API_KEY or PERPLEXITY_API_KEY not set")
             return False
 
         client = AsyncOpenAI(
