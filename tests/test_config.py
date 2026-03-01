@@ -77,10 +77,8 @@ system_prompt = "Test prompt"
                 assert config.max_search_results == 100
                 assert config.llm_max_tokens == 4096
                 assert config.llm_timeout_seconds == 300
-                assert config.llm_model == "claude-haiku-3-5"
-                assert (
-                    config.llm_base_url == "https://opencode.ai/zen/v1/chat/completions"
-                )
+                assert config.llm_model == "minimax-m2.5-free"
+                assert config.llm_base_url == "https://opencode.ai/zen/v1"
                 assert config.database_path == "data/submissions.db"
             finally:
                 Path(f.name).unlink()
