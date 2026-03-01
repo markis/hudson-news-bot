@@ -1,13 +1,13 @@
 # Hudson News Bot
 
-A Python news aggregation bot that integrates with Reddit using Perplexity API.
+A Python news aggregation bot that integrates with Reddit using LLM APIs.
 The bot aggregates news articles, provides intelligent content summarization,
 and includes de-duplication capabilities to prevent duplicate posts.
 
 ## Features
 
 - 🔄 **News Aggregation**: Automatically fetches and processes news articles
-- 🤖 **LLM Integration**: Uses Perplexity API for intelligent content summarization
+- 🤖 **LLM Integration**: Uses OpenCode Zen or Perplexity API for intelligent content summarization
 - 📱 **Reddit Integration**: Posts content to Reddit with PRAW
 - 🚫 **De-duplication**: Prevents duplicate content from being posted
 - ⚙️ **Configurable**: Flexible configuration via TOML files and environment variables
@@ -18,7 +18,7 @@ and includes de-duplication capabilities to prevent duplicate posts.
 
 - Python 3.12+
 - Reddit API credentials
-- Perplexity API key
+- OpenCode Zen API key (or Perplexity API key for backward compatibility)
 
 ## Installation
 
@@ -47,9 +47,10 @@ and includes de-duplication capabilities to prevent duplicate posts.
    - Create a new application
    - Add client ID and secret to your `.env` file
 
-5. **Configure Perplexity API**:
-   - Get your API key from <https://www.perplexity.ai/settings/api>
-   - Add it to your `.env` file as `PERPLEXITY_API_KEY`
+5. **Configure LLM API**:
+   - Get your API key from [OpenCode Zen](https://opencode.ai/auth)
+   - Add it to your `.env` file as `LLM_API_KEY`
+   - Or use `PERPLEXITY_API_KEY` for backward compatibility with Perplexity
 
 ## Usage
 
@@ -146,8 +147,10 @@ REDDIT_CLIENT_SECRET=your_client_secret
 REDDIT_USERNAME=your_username  # Optional
 REDDIT_PASSWORD=your_password  # Optional
 
-# Perplexity API
-PERPLEXITY_API_KEY=your_api_key
+# LLM API
+LLM_API_KEY=your_api_key  # Get from https://opencode.ai/auth
+# Or use PERPLEXITY_API_KEY for backward compatibility
+# PERPLEXITY_API_KEY=your_api_key
 
 # Optional settings
 LOG_LEVEL=INFO
@@ -167,6 +170,10 @@ sources = ["example.com", "news.example.org"]
 [reddit]
 subreddit = "worldnews"
 title_template = "Breaking: {title}"
+
+[llm]
+model = "claude-haiku-3-5"  # or gpt-5-nano, gemini-3-flash, sonar-pro
+base_url = "https://opencode.ai/zen/v1/chat/completions"  # Default for OpenCode Zen
 
 [logging]
 level = "DEBUG"
@@ -200,7 +207,7 @@ src/hudson_news_bot/
 ### Key Components
 
 - **NewsBot**: Main orchestrator that coordinates all components
-- **NewsAggregator**: Handles news fetching and Perplexity API integration
+- **NewsAggregator**: Handles news fetching and LLM API integration (OpenCode Zen or Perplexity)
 - **RedditClient**: Manages Reddit API interactions and posting
 - **Deduplicator**: Prevents duplicate content using content hashing
 - **Config**: Centralized configuration management with TOML support
@@ -251,7 +258,7 @@ uv run pytest -v
 ### Common Issues
 
 1. **Reddit API Errors**: Ensure your Reddit app credentials are correct
-2. **Perplexity API Issues**: Verify your API key is correct and has sufficient credits
+2. **LLM API Issues**: Verify your API key (`LLM_API_KEY` or `PERPLEXITY_API_KEY`) is correct and has sufficient credits
 3. **Connection Failures**: Use `--test-connections` to diagnose network issues
 4. **Configuration Problems**: Check your `.env` file and TOML configuration syntax
 
