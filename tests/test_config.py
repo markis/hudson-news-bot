@@ -77,8 +77,10 @@ system_prompt = "Test prompt"
                 assert config.max_search_results == 100
                 assert config.llm_max_tokens == 4096
                 assert config.llm_timeout_seconds == 300
-                assert config.llm_model == "sonar-pro"
-                assert config.llm_base_url == "https://api.perplexity.ai"
+                assert config.llm_model == "claude-haiku-3-5"
+                assert (
+                    config.llm_base_url == "https://opencode.ai/zen/v1/chat/completions"
+                )
                 assert config.database_path == "data/submissions.db"
             finally:
                 Path(f.name).unlink()
@@ -112,6 +114,63 @@ system_prompt = "Test prompt"
                 assert config.reddit_username == "test_user"
                 assert config.reddit_password == "test_pass"
                 assert config.perplexity_api_key == "test_api_key"
+            finally:
+                Path(f.name).unlink()
+
+    @patch.dict(os.environ, {"PERPLEXITY_API_KEY": "old_key"})
+    def test_llm_api_key_backward_compatibility(self) -> None:
+        """Test llm_api_key falls back to PERPLEXITY_API_KEY."""
+        config_content = """
+[news]
+system_prompt = "Test prompt"
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write(config_content)
+            f.flush()
+
+            try:
+                config = Config(f.name)
+                assert config.llm_api_key == "old_key"
+            finally:
+                Path(f.name).unlink()
+
+    @patch.dict(os.environ, {"LLM_API_KEY": "new_key"})
+    def test_llm_api_key_new_variable(self) -> None:
+        """Test llm_api_key uses LLM_API_KEY when available."""
+        config_content = """
+[news]
+system_prompt = "Test prompt"
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write(config_content)
+            f.flush()
+
+            try:
+                config = Config(f.name)
+                assert config.llm_api_key == "new_key"
+            finally:
+                Path(f.name).unlink()
+
+    @patch.dict(
+        os.environ,
+        {"LLM_API_KEY": "new_key", "PERPLEXITY_API_KEY": "old_key"},
+    )
+    def test_llm_api_key_precedence(self) -> None:
+        """Test llm_api_key prefers LLM_API_KEY over PERPLEXITY_API_KEY."""
+        config_content = """
+[news]
+system_prompt = "Test prompt"
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write(config_content)
+            f.flush()
+
+            try:
+                config = Config(f.name)
+                assert config.llm_api_key == "new_key"
             finally:
                 Path(f.name).unlink()
 

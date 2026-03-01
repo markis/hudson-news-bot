@@ -29,10 +29,10 @@ check_for_duplicates = true
 max_search_results = 100
 
 [llm]
-model = "sonar-pro"
+model = "claude-haiku-3-5"
+base_url = "https://opencode.ai/zen/v1/chat/completions"
 max_tokens = 4096
 timeout_seconds = 300
-# base_url = "https://api.perplexity.ai"  # default, uncomment to override
 
 [database]
 path = "data/submissions.db"

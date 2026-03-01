@@ -109,10 +109,10 @@ DEFAULT_CONFIG: Final[ConfigDict] = {
         "max_search_results": 100,
     },
     "llm": {
-        "model": "sonar-pro",
+        "model": "claude-haiku-3-5",
         "max_tokens": 4096,
         "timeout_seconds": 300,
-        "base_url": "https://api.perplexity.ai",
+        "base_url": "https://opencode.ai/zen/v1/chat/completions",
     },
     "database": {"path": "data/submissions.db"},
 }
@@ -227,6 +227,12 @@ class Config:
     def perplexity_api_key(self) -> str | None:
         """Get Perplexity API key from environment."""
         return os.getenv("PERPLEXITY_API_KEY")
+
+    @cached_property
+    def llm_api_key(self) -> str | None:
+        """Get LLM API key from environment (checks both new and old names)."""
+        # Check new name first, fall back to old name for backward compatibility
+        return os.getenv("LLM_API_KEY") or os.getenv("PERPLEXITY_API_KEY")
 
     @cached_property
     def reddit_client_id(self) -> str | None:
