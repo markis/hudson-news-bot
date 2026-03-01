@@ -4,7 +4,7 @@ This file provides guidance for AI coding agents working in this repository.
 
 ## Project Overview
 
-Hudson News Bot is a Python 3.12+ news aggregation bot that scrapes Hudson, Ohio news sites, uses LLM API (Perplexity) for intelligent content analysis, and posts to Reddit with deduplication. Key technologies: `asyncio`, `asyncpraw`, `playwright`, `openai` (AsyncOpenAI client).
+Hudson News Bot is a Python 3.12+ news aggregation bot that scrapes Hudson, Ohio news sites, uses LLM API (OpenCode Zen with minimax-m2.5-free by default) for intelligent content analysis, and posts to Reddit with deduplication. Key technologies: `asyncio`, `asyncpraw`, `playwright`, `openai` (AsyncOpenAI client).
 
 ## Build System & Dependencies
 
@@ -73,7 +73,7 @@ make dev
 make run                      # Normal execution
 make run-dry                  # Dry-run with DEBUG logging (no posting)
 make run-debug                # Run with DEBUG logging
-make test-connections         # Test Reddit + Perplexity API connections
+make test-connections         # Test Reddit + LLM API connections
 make stats                    # Display bot statistics
 ```
 
@@ -85,7 +85,7 @@ src/hudson_news_bot/
 ├── config/
 │   └── settings.py           # Config management with TOML + env vars
 ├── news/
-│   ├── aggregator.py         # NewsAggregator (Perplexity API integration)
+│   ├── aggregator.py         # NewsAggregator (LLM API integration)
 │   ├── models.py             # NewsItem & NewsCollection dataclasses
 │   └── scraper.py            # WebsiteScraper (Playwright-based)
 ├── reddit/
