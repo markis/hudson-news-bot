@@ -217,6 +217,13 @@ class Config:
         return int(self._data.get("news", {}).get("scraping_cache_hours", 24))
 
     @cached_property
+    def prompts_dir(self) -> Path:
+        """Get prompts directory path."""
+        # Default to config/prompts relative to project root
+        project_root = Path(__file__).parent.parent.parent.parent
+        return project_root / "config" / "prompts"
+
+    @cached_property
     def news_sites(self) -> list[str]:
         """Get list of news sites to scrape."""
         default_sites: list[str] = []
