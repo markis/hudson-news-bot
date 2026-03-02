@@ -386,6 +386,33 @@ class TestAggregateNews:
         assert len(result) == 0
 
 
+class TestTemplateLoading:
+    """Test Jinja2 template loading."""
+
+    def test_templates_load_successfully(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test that templates load without errors."""
+        monkeypatch.setenv("LLM_API_KEY", "test-api-key")
+        config = Config()
+        reddit_client = MagicMock()
+
+        aggregator = NewsAggregator(config, reddit_client)
+
+        assert aggregator._system_template is not None
+        assert aggregator._analysis_template is not None
+
+    def test_missing_template_raises_error(self, tmp_path: Path) -> None:
+        """Test that missing templates raise ValueError."""
+        config = MagicMock(spec=Config)
+        config.perplexity_api_key = "test-api-key"
+        config.llm_base_url = "https://api.test.com"
+        config.llm_timeout_seconds = 30
+        config.llm_api_key = "test-api-key"
+        config.prompts_dir = tmp_path
+
+        with pytest.raises(ValueError, match="Prompt template not found"):
+            NewsAggregator(config, None)
+
+
 class TestResponseParsing:
     """Test response parsing methods."""
 
