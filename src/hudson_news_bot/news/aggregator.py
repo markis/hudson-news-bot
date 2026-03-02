@@ -190,10 +190,25 @@ class NewsAggregator:
                 }
             )
 
+        # Generate example response from Pydantic model (source of truth)
+        has_flair = bool(flair_options)
+        example_item = NewsItemResponse(
+            headline="story headline",
+            summary="brief 2-3 sentence summary of the article",
+            publication_date="YYYY-MM-DD",
+            link="https://source.com/article",
+            flair="category name" if has_flair else None,
+        )
+        example_response = NewsResponse(news=[example_item])
+        example_json = example_response.model_dump_json(
+            exclude_none=not has_flair, indent=2
+        )
+
         context = {
             "today": today,
             "articles": limited_articles,
             "flair_options": flair_options or {},
+            "example_json": example_json,
         }
 
         try:

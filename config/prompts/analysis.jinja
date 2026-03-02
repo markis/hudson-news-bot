@@ -48,17 +48,7 @@ Available Categories for Classification:
 <output_format>
 For each selected article, format your response as valid JSON using this EXACT structure:
 
-{
-  "news": [
-    {
-      "headline": "story headline",
-      "summary": "brief 2-3 sentence summary of the article",
-      "publication_date": "YYYY-MM-DD",
-      "link": "https://source.com/article"{% if flair_options %},
-      "flair": "category name"{% endif %}
-    }
-  ]
-}
+{{ example_json }}
 
 IMPORTANT:
 - Output ONLY the JSON data, no explanatory text.
