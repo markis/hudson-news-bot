@@ -76,6 +76,7 @@ class NewsAggregator:
                 undefined=StrictUndefined,  # Fail on missing variables
                 trim_blocks=True,  # Remove newlines after blocks
                 lstrip_blocks=True,  # Remove leading whitespace
+                autoescape=False,  # Rendering prompts, not HTML  # nosec B701
             )
             self._system_template = self._jinja_env.get_template("system.jinja")
             self._analysis_template = self._jinja_env.get_template("analysis.jinja")
