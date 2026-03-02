@@ -103,6 +103,19 @@ src/hudson_news_bot/
 - Type hints required for all functions (MyPy strict mode)
 - Final variables marked with `Final` type annotation
 
+## Prompt Templates
+
+LLM prompts are stored as Jinja2 templates in `config/prompts/`:
+- `system.jinja` - System prompt for news analysis
+- `analysis.jinja` - User prompt with dynamic article data
+
+Templates support variables, loops, and conditionals:
+- `{{ today }}` - Current date
+- `{% for article in articles %}` - Iterate over articles
+- `{% if flair_options %}` - Conditional flair section
+
+Edit templates directly without code changes. Restart bot to reload.
+
 ## Code Style Guidelines
 
 ### Imports

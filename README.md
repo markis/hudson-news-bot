@@ -180,6 +180,28 @@ level = "DEBUG"
 file = "logs/bot.log"
 ```
 
+### Customizing Prompts
+
+LLM prompts are stored in `config/prompts/` as Jinja2 templates:
+
+- **System Prompt**: `config/prompts/system.jinja`
+- **Analysis Prompt**: `config/prompts/analysis.jinja`
+
+Edit these files to customize how the bot analyzes news articles. Changes require restarting the bot.
+
+The analysis prompt supports dynamic variables:
+- `{{ today }}` - Current date
+- `{{ articles }}` - List of scraped articles
+- `{{ flair_options }}` - Available Reddit flairs
+
+Example template syntax:
+```jinja
+Today is {{ today }}. 
+{% for article in articles %}
+- {{ article.headline }}
+{% endfor %}
+```
+
 ## Architecture
 
 The project follows a modular architecture:
