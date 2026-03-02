@@ -9,6 +9,8 @@ from typing import Final
 
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateNotFound
+from pathlib import Path
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsCollection, NewsItem
