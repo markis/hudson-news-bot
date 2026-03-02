@@ -7,10 +7,9 @@ import logging
 import sys
 from typing import Final
 
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateNotFound
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
-from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateNotFound
-from pathlib import Path
 
 from hudson_news_bot.config.settings import Config
 from hudson_news_bot.news.models import NewsCollection, NewsItem
@@ -69,6 +68,25 @@ class NewsAggregator:
             base_url=config.llm_base_url,
             timeout=config.llm_timeout_seconds,
         )
+
+        # Initialize Jinja2 template environment
+        try:
+            self._jinja_env = Environment(
+                loader=FileSystemLoader(config.prompts_dir),
+                undefined=StrictUndefined,  # Fail on missing variables
+                trim_blocks=True,  # Remove newlines after blocks
+                lstrip_blocks=True,  # Remove leading whitespace
+            )
+            self._system_template = self._jinja_env.get_template("system.jinja")
+            self._analysis_template = self._jinja_env.get_template("analysis.jinja")
+            self.logger.info(f"Loaded prompt templates from {config.prompts_dir}")
+        except TemplateNotFound as e:
+            raise ValueError(
+                f"Prompt template not found: {e.name}. "
+                f"Expected templates in {config.prompts_dir}"
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to load prompt templates: {e}")
 
     async def aggregate_news(self) -> NewsCollection:
         """Aggregate news stories using website scraping and LLM analysis.
