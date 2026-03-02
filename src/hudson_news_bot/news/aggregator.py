@@ -129,14 +129,14 @@ class NewsAggregator:
                 self.logger.warning(f"Could not get flair options: {e}")
 
         # Send scraped content to LLM for analysis with structured output
-        prompt = self.create_analysis_prompt(articles, flair_options)
+        prompt = self.render_analysis_prompt(articles, flair_options)
         self.logger.debug("Sending analysis prompt to LLM with structured output")
 
         try:
             response = await self.client.chat.completions.create(
                 model=self.config.llm_model,
                 messages=[
-                    {"role": "system", "content": self.config.system_prompt},
+                    {"role": "system", "content": self._system_template.render()},
                     {"role": "user", "content": prompt},
                 ],
                 max_tokens=self.config.llm_max_tokens,
@@ -160,81 +160,47 @@ class NewsAggregator:
 
         raise Exception("No response received from LLM")
 
-    def create_analysis_prompt(
+    def render_analysis_prompt(
         self, articles: list[NewsItemDict], flair_options: dict[str, str] | None = None
     ) -> str:
-        """Create the prompt for LLM to analyze scraped articles.
+        """Render the analysis prompt using Jinja2 template.
 
         Args:
             articles: List of scraped article dictionaries
             flair_options: Optional mapping of flair text to template IDs
 
         Returns:
-            Formatted prompt string
+            Rendered prompt string
+
+        Raises:
+            ValueError: If template rendering fails
         """
         today = datetime.datetime.now().strftime("%Y-%m-%d")
 
-        # Prepare article summaries efficiently
-        article_summaries: list[str] = [
-            f"""
-Article {i}:
-URL: {article.get("url", "N/A")}
-Headline: {article.get("headline", "N/A")}
-Date: {article.get("date", "N/A")}
-Content Preview: {(article.get("content") or "N/A")[:500]}...
-"""
-            for i, article in enumerate(articles[:20], 1)  # Limit to first 20 articles
-        ]
+        # Limit to first 20 articles and truncate content
+        limited_articles = []
+        for article in articles[:20]:
+            limited_articles.append(
+                {
+                    "url": article.get("url", "N/A"),
+                    "headline": article.get("headline", "N/A"),
+                    "date": article.get("date", "N/A"),
+                    "content": (article.get("content") or "N/A")[:500],
+                }
+            )
 
-        # Add flair options to prompt if available
-        flair_section = ""
-        if flair_options:
-            flair_list = "\n".join(f"- {text}" for text in flair_options.keys())
-            flair_section = f"""
+        context = {
+            "today": today,
+            "articles": limited_articles,
+            "flair_options": flair_options or {},
+        }
 
-Available Categories for Classification:
-{flair_list}
-
-For each article, also assign the most appropriate category from the list above."""
-
-        prompt = f"""Today is {today}. I've scraped the following articles from Hudson, Ohio news sites.
-Please analyze them and identify the NEWEST and most relevant local news articles.
-
-{"".join(article_summaries)}
-
-From these articles, select the most recent and relevant Hudson, Ohio news stories.{flair_section}
-For each selected article, format your response as valid JSON using this EXACT structure:
-
-{{
-  "news": [
-    {{
-      "headline": "story headline",
-      "summary": "brief 2-3 sentence summary of the article",
-      "publication_date": "YYYY-MM-DD",
-      "link": "https://source.com/article"{"," if flair_options else ""}
-      {'      "flair": "category name"' if flair_options else ""}
-    }},
-    {{
-      "headline": "second story headline",
-      "summary": "second story summary",
-      "publication_date": "YYYY-MM-DD",
-      "link": "https://source.com/second-article"{"," if flair_options else ""}
-      {'      "flair": "category name"' if flair_options else ""}
-    }}
-  ]
-}}
-
-IMPORTANT:
-- Only include articles that are clearly about Hudson, Ohio or directly relevant to Hudson residents
-- Prioritize the most recent articles (from today or yesterday)
-- Ensure dates are in YYYY-MM-DD format
-- Write clear, concise summaries that capture the key points
-- Output ONLY the JSON data, no explanatory text
-- If no relevant articles are found, return an empty array: {{"news": []}}
-{"- Assign the most appropriate flair/category from the provided list" if flair_options else ""}
-"""
-
-        return prompt
+        try:
+            return self._analysis_template.render(**context)
+        except Exception as e:
+            self.logger.error(f"Template rendering failed: {e}")
+            self.logger.debug(f"Context keys: {context.keys()}")
+            raise ValueError(f"Failed to render analysis prompt: {e}")
 
     def _parse_structured_response(self, response: str) -> NewsCollection:
         """Parse structured LLM response into NewsCollection.
