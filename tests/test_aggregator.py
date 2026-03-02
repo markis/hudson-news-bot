@@ -1,6 +1,7 @@
 """Tests for news aggregator."""
 
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
@@ -14,7 +15,23 @@ class TestNewsAggregator:
     """Test NewsAggregator class."""
 
     @pytest.fixture
-    def config(self) -> Config:
+    def temp_prompts_dir(self, tmp_path: Path) -> Path:
+        """Create temporary prompts directory with test templates."""
+        prompts_dir = tmp_path / "prompts"
+        prompts_dir.mkdir()
+
+        # Create test system template
+        system_template = prompts_dir / "system.jinja"
+        system_template.write_text("Test system prompt")
+
+        # Create test analysis template
+        analysis_template = prompts_dir / "analysis.jinja"
+        analysis_template.write_text("Test analysis prompt for {{ today }}")
+
+        return prompts_dir
+
+    @pytest.fixture
+    def config(self, temp_prompts_dir: Path) -> Config:
         """Create test configuration."""
         config = MagicMock(spec=Config)
         config.system_prompt = "Test system prompt"
@@ -24,6 +41,7 @@ class TestNewsAggregator:
         config.llm_timeout_seconds = 30
         config.llm_model = "test-model"
         config.llm_max_tokens = 4096
+        config.prompts_dir = temp_prompts_dir
         return config
 
     @pytest.fixture
@@ -39,7 +57,7 @@ class TestNewsAggregator:
         assert aggregator.logger.name == "hudson_news_bot.news.aggregator"
         assert aggregator.client is not None
 
-    def test_config_integration(self) -> None:
+    def test_config_integration(self, temp_prompts_dir: Path) -> None:
         """Test that aggregator properly uses config values."""
         config = MagicMock(spec=Config)
         config.system_prompt = "Custom prompt"
@@ -49,6 +67,7 @@ class TestNewsAggregator:
         config.llm_timeout_seconds = 30
         config.llm_model = "test-model"
         config.llm_max_tokens = 4096
+        config.prompts_dir = temp_prompts_dir
 
         aggregator = NewsAggregator(config)
 
@@ -106,7 +125,28 @@ class TestAggregateNews:
     """Test the aggregate_news method with comprehensive mocking."""
 
     @pytest.fixture
-    def config(self) -> Config:
+    def temp_prompts_dir(self, tmp_path: Path) -> Path:
+        """Create temporary prompts directory with test templates."""
+        prompts_dir = tmp_path / "prompts"
+        prompts_dir.mkdir()
+
+        # Create test system template
+        system_template = prompts_dir / "system.jinja"
+        system_template.write_text("Test system prompt")
+
+        # Create test analysis template with article data
+        analysis_template = prompts_dir / "analysis.jinja"
+        analysis_template.write_text(
+            "Test analysis prompt for {{ today }}\n"
+            "{% for article in articles %}"
+            "{{ article.headline }}\n"
+            "{% endfor %}"
+        )
+
+        return prompts_dir
+
+    @pytest.fixture
+    def config(self, temp_prompts_dir: Path) -> Config:
         config = MagicMock(spec=Config)
         config.system_prompt = "Test system prompt"
         config.max_articles = 3
@@ -116,6 +156,7 @@ class TestAggregateNews:
         config.llm_timeout_seconds = 30
         config.llm_model = "test-model"
         config.llm_max_tokens = 4096
+        config.prompts_dir = temp_prompts_dir
         return config
 
     @pytest.fixture
@@ -349,7 +390,28 @@ class TestResponseParsing:
     """Test response parsing methods."""
 
     @pytest.fixture
-    def aggregator(self) -> NewsAggregator:
+    def temp_prompts_dir(self, tmp_path: Path) -> Path:
+        """Create temporary prompts directory with test templates."""
+        prompts_dir = tmp_path / "prompts"
+        prompts_dir.mkdir()
+
+        # Create test system template
+        system_template = prompts_dir / "system.jinja"
+        system_template.write_text("Test system prompt")
+
+        # Create test analysis template with article loop
+        analysis_template = prompts_dir / "analysis.jinja"
+        analysis_template.write_text(
+            "{{ today }}\n"
+            "{% for article in articles %}"
+            "{{ article.headline }} - {{ article.url }}\n"
+            "{% endfor %}"
+        )
+
+        return prompts_dir
+
+    @pytest.fixture
+    def aggregator(self, temp_prompts_dir: Path) -> NewsAggregator:
         config = MagicMock(spec=Config)
         config.system_prompt = "Test"
         config.max_articles = 10
@@ -358,9 +420,10 @@ class TestResponseParsing:
         config.llm_timeout_seconds = 30
         config.llm_model = "test-model"
         config.llm_max_tokens = 4096
+        config.prompts_dir = temp_prompts_dir
         return NewsAggregator(config)
 
-    def test_create_analysis_prompt(self, aggregator: NewsAggregator) -> None:
+    def test_render_analysis_prompt(self, aggregator: NewsAggregator) -> None:
         articles: list[NewsItemDict] = [
             NewsItemDict(
                 url="https://hudson.com/article1",
@@ -377,9 +440,9 @@ class TestResponseParsing:
                 summary="",
             ),
         ]
-        prompt = aggregator.create_analysis_prompt(articles)
+        prompt = aggregator.render_analysis_prompt(articles)
 
-        assert "2025-" in prompt
+        assert "2026-" in prompt  # Updated year to match current date
         assert "Test Article 1" in prompt
         assert "Test Article 2" in prompt
         assert "hudson.com" in prompt
