@@ -459,6 +459,57 @@ class TestTemplateLoading:
         assert "Test Article" in result
         assert "Available Categories for Classification:" not in result
 
+    def test_render_limits_to_20_articles(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that rendering only uses first 20 articles."""
+        monkeypatch.setenv("LLM_API_KEY", "test-api-key")
+        config = Config()
+        aggregator = NewsAggregator(config, None)
+
+        # Create 25 articles
+        articles: list[NewsItemDict] = []
+        for i in range(25):
+            articles.append(
+                NewsItemDict(
+                    url=f"https://example.com/article{i}",
+                    headline=f"Article {i}",
+                    date="2026-03-02",
+                    content="Content",
+                    summary="",
+                )
+            )
+
+        result = aggregator.render_analysis_prompt(articles, None)
+
+        # Should contain Article 20: (20th article, 1-indexed in template)
+        assert "Article 20:" in result
+        # Should NOT contain Article 21: (21st article)
+        assert "Article 21:" not in result
+
+    def test_render_truncates_content(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test that content is truncated to 500 chars."""
+        monkeypatch.setenv("LLM_API_KEY", "test-api-key")
+        config = Config()
+        aggregator = NewsAggregator(config, None)
+
+        long_content = "x" * 1000
+        articles: list[NewsItemDict] = [
+            NewsItemDict(
+                url="https://example.com/article1",
+                headline="Test",
+                date="2026-03-02",
+                content=long_content,
+                summary="",
+            )
+        ]
+
+        result = aggregator.render_analysis_prompt(articles, None)
+
+        # Content should be truncated
+        assert "x" * 500 in result
+        assert "x" * 501 not in result
+
 
 class TestResponseParsing:
     """Test response parsing methods."""
