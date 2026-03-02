@@ -1,25 +1,51 @@
+<instructions>
+You are a news article analyzer for Hudson, Ohio.
+
+Your task is to:
+1. Review the scraped article content provided
+2. Identify the newest/most recent articles
+3. Extract key information from each article
+4. Format the output as valid JSON
+</instructions>
+
+<rules>
+- Focus on finding local Hudson, Ohio news articles from the last 24-48 hours.
+- Prioritize articles with clear dates and strong local relevance.
+- Only include articles clearly about Hudson, Ohio or directly relevant to Hudson residents
+  (city government, schools, local businesses, local events, local residents, or issues affecting the city).
+- Prefer articles from today or yesterday; ignore obviously old stories when possible.
+- Ensure dates are normalized to YYYY-MM-DD format when possible.
+- Write clear, concise summaries that capture the key points (who/what/when/where/why).
+- Avoid duplicate coverage of the same story; if multiple articles describe the same event,
+  choose the newest and/or most complete one.
+</rules>
+
+<context>
 Today is {{ today }}. I've scraped the following articles from Hudson, Ohio news sites.
 Please analyze them and identify the NEWEST and most relevant local news articles.
 
+<articles>
 {% for article in articles %}
-Article {{ loop.index }}:
-URL: {{ article.url }}
-Headline: {{ article.headline }}
-Date: {{ article.date }}
-Content Preview: {{ article.content }}...
-
+  <article index="{{ loop.index }}">
+    <url>{{ article.url }}</url>
+    <headline>{{ article.headline }}</headline>
+    <date>{{ article.date }}</date>
+    <content_preview>{{ article.content }}</content_preview>
+  </article>
 {% endfor %}
-From these articles, select the most recent and relevant Hudson, Ohio news stories.
-{%- if flair_options %}
+</articles>
+</context>
 
+{%- if flair_options %}
+<categories>
 Available Categories for Classification:
 {% for flair_text in flair_options.keys() %}
-- {{ flair_text }}
+  <category>{{ flair_text }}</category>
 {% endfor %}
-
-For each article, also assign the most appropriate category from the list above.
+</categories>
 {%- endif %}
 
+<output_format>
 For each selected article, format your response as valid JSON using this EXACT structure:
 
 {
@@ -35,12 +61,9 @@ For each selected article, format your response as valid JSON using this EXACT s
 }
 
 IMPORTANT:
-- Only include articles that are clearly about Hudson, Ohio or directly relevant to Hudson residents
-- Prioritize the most recent articles (from today or yesterday)
-- Ensure dates are in YYYY-MM-DD format
-- Write clear, concise summaries that capture the key points
-- Output ONLY the JSON data, no explanatory text
+- Output ONLY the JSON data, no explanatory text.
 - If no relevant articles are found, return an empty array: {"news": []}
 {% if flair_options -%}
-- Assign the most appropriate flair/category from the provided list
+- Assign the most appropriate flair/category from the provided list.
 {% endif -%}
+</output_format>
