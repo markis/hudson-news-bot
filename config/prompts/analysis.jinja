@@ -1,0 +1,46 @@
+Today is {{ today }}. I've scraped the following articles from Hudson, Ohio news sites.
+Please analyze them and identify the NEWEST and most relevant local news articles.
+
+{% for article in articles %}
+Article {{ loop.index }}:
+URL: {{ article.url }}
+Headline: {{ article.headline }}
+Date: {{ article.date }}
+Content Preview: {{ article.content }}...
+
+{% endfor %}
+From these articles, select the most recent and relevant Hudson, Ohio news stories.
+{%- if flair_options %}
+
+Available Categories for Classification:
+{% for flair_text in flair_options.keys() %}
+- {{ flair_text }}
+{% endfor %}
+
+For each article, also assign the most appropriate category from the list above.
+{%- endif %}
+
+For each selected article, format your response as valid JSON using this EXACT structure:
+
+{
+  "news": [
+    {
+      "headline": "story headline",
+      "summary": "brief 2-3 sentence summary of the article",
+      "publication_date": "YYYY-MM-DD",
+      "link": "https://source.com/article"{% if flair_options %},
+      "flair": "category name"{% endif %}
+    }
+  ]
+}
+
+IMPORTANT:
+- Only include articles that are clearly about Hudson, Ohio or directly relevant to Hudson residents
+- Prioritize the most recent articles (from today or yesterday)
+- Ensure dates are in YYYY-MM-DD format
+- Write clear, concise summaries that capture the key points
+- Output ONLY the JSON data, no explanatory text
+- If no relevant articles are found, return an empty array: {"news": []}
+{% if flair_options -%}
+- Assign the most appropriate flair/category from the provided list
+{% endif -%}
