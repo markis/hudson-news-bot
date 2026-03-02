@@ -177,7 +177,17 @@ class Config:
     @cached_property
     def prompts_dir(self) -> Path:
         """Get prompts directory path."""
-        # Default to config/prompts relative to project root
+        # Check for environment variable first (useful for containers)
+        prompts_path = os.getenv("PROMPTS_DIR")
+        if prompts_path:
+            return Path(prompts_path)
+
+        # Try /app/config/prompts (container default)
+        container_path = Path("/app/config/prompts")
+        if container_path.exists():
+            return container_path
+
+        # Fall back to relative path for development
         project_root = Path(__file__).parent.parent.parent.parent
         return project_root / "config" / "prompts"
 

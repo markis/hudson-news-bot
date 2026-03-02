@@ -478,10 +478,10 @@ class TestTemplateLoading:
 
         result = aggregator.render_analysis_prompt(articles, None)
 
-        # Should contain Article 20: (20th article, 1-indexed in template)
-        assert "Article 20:" in result
-        # Should NOT contain Article 21: (21st article)
-        assert "Article 21:" not in result
+        # Should contain article index 20 (20th article, 1-indexed in template)
+        assert '<article index="20">' in result
+        # Should NOT contain article index 21 (21st article)
+        assert '<article index="21">' not in result
 
     def test_render_truncates_content(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that content is truncated to 500 chars."""
