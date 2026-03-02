@@ -412,6 +412,53 @@ class TestTemplateLoading:
         with pytest.raises(ValueError, match="Prompt template not found"):
             NewsAggregator(config, None)
 
+    def test_render_analysis_with_flair(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test rendering analysis prompt with flair options."""
+        monkeypatch.setenv("LLM_API_KEY", "test-api-key")
+        config = Config()
+        aggregator = NewsAggregator(config, None)
+
+        articles: list[NewsItemDict] = [
+            NewsItemDict(
+                url="https://example.com/article1",
+                headline="Test Article",
+                date="2026-03-02",
+                content="Test content here",
+                summary="",
+            )
+        ]
+        flair_options = {"News": "123", "Events": "456"}
+
+        result = aggregator.render_analysis_prompt(articles, flair_options)
+
+        assert "2026-03-02" in result or "Today is" in result
+        assert "Test Article" in result
+        assert "Available Categories for Classification:" in result
+        assert "News" in result
+
+    def test_render_analysis_without_flair(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test rendering analysis prompt without flair options."""
+        monkeypatch.setenv("LLM_API_KEY", "test-api-key")
+        config = Config()
+        aggregator = NewsAggregator(config, None)
+
+        articles: list[NewsItemDict] = [
+            NewsItemDict(
+                url="https://example.com/article1",
+                headline="Test Article",
+                date="2026-03-02",
+                content="Test content",
+                summary="",
+            )
+        ]
+
+        result = aggregator.render_analysis_prompt(articles, None)
+
+        assert "Test Article" in result
+        assert "Available Categories for Classification:" not in result
+
 
 class TestResponseParsing:
     """Test response parsing methods."""
