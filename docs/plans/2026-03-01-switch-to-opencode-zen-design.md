@@ -66,21 +66,21 @@ timeout_seconds = 300
 
 **Modified files:**
 1. `src/hudson_news_bot/config/settings.py`
-   - Update `DEFAULT_CONFIG` llm section
-   - Update `llm_api_key` property to check `LLM_API_KEY` first, then `PERPLEXITY_API_KEY` for backward compatibility
+    - Update `DEFAULT_CONFIG` llm section
+    - Update `llm_api_key` property to check `LLM_API_KEY` first, then `PERPLEXITY_API_KEY` for backward compatibility
 
 2. `src/hudson_news_bot/news/aggregator.py`
-   - Update docstrings/comments referencing Perplexity
-   - Change API key retrieval to use `config.llm_api_key`
+    - Update docstrings/comments referencing Perplexity
+    - Change API key retrieval to use `config.llm_api_key`
 
 3. `.env.example`
-   - Update from `PERPLEXITY_API_KEY` to `LLM_API_KEY`
-   - Add comment about OpenCode Zen
+    - Update from `PERPLEXITY_API_KEY` to `LLM_API_KEY`
+    - Add comment about OpenCode Zen
 
 4. `README.md`
-   - Update setup instructions
-   - Change API key references
-   - Update provider links
+    - Update setup instructions
+    - Change API key references
+    - Update provider links
 
 **What stays unchanged:**
 - All prompt logic (system prompt, user prompt generation)

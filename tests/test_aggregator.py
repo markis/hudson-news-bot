@@ -34,7 +34,6 @@ class TestNewsAggregator:
     def config(self, temp_prompts_dir: Path) -> Config:
         """Create test configuration."""
         config = MagicMock(spec=Config)
-        config.system_prompt = "Test system prompt"
         config.max_articles = 10
         config.perplexity_api_key = "test-api-key"
         config.llm_base_url = "https://api.test.com"
@@ -60,7 +59,6 @@ class TestNewsAggregator:
     def test_config_integration(self, temp_prompts_dir: Path) -> None:
         """Test that aggregator properly uses config values."""
         config = MagicMock(spec=Config)
-        config.system_prompt = "Custom prompt"
         config.max_articles = 5
         config.perplexity_api_key = "test-api-key"
         config.llm_base_url = "https://api.test.com"
@@ -71,7 +69,6 @@ class TestNewsAggregator:
 
         aggregator = NewsAggregator(config)
 
-        assert aggregator.config.system_prompt == "Custom prompt"
         assert aggregator.config.max_articles == 5
 
 
@@ -148,7 +145,6 @@ class TestAggregateNews:
     @pytest.fixture
     def config(self, temp_prompts_dir: Path) -> Config:
         config = MagicMock(spec=Config)
-        config.system_prompt = "Test system prompt"
         config.max_articles = 3
         config.news_sites = ["https://example.com"]
         config.perplexity_api_key = "test-api-key"
@@ -166,20 +162,20 @@ class TestAggregateNews:
     @pytest.fixture
     def sample_json_response(self) -> str:
         return """{
-  "news": [
-    {
-      "headline": "Hudson Council Approves Budget",
-      "summary": "The Hudson City Council approved a $50M budget for the upcoming fiscal year.",
-      "publication_date": "2025-08-14",
-      "link": "https://hudson.com/budget-approval"
-    },
-    {
-      "headline": "New Park Opens Downtown",
-      "summary": "Hudson's newest park featuring walking trails and playground equipment opened to the public.",
-      "publication_date": "2025-08-13",
-      "link": "https://hudson.com/new-park"
-    }
-  ]
+    "news": [
+        {
+            "headline": "Hudson Council Approves Budget",
+            "summary": "The Hudson City Council approved a $50M budget for the upcoming fiscal year.",
+            "publication_date": "2025-08-14",
+            "link": "https://hudson.com/budget-approval"
+        },
+        {
+            "headline": "New Park Opens Downtown",
+            "summary": "Hudson's newest park featuring walking trails and playground equipment opened to the public.",
+            "publication_date": "2025-08-13",
+            "link": "https://hudson.com/new-park"
+        }
+    ]
 }"""
 
     @pytest.fixture
@@ -331,13 +327,13 @@ class TestAggregateNews:
 
         # Mock OpenAI client with structured JSON response including flair
         json_response = """{
-  "news": [{
-    "headline": "Hudson Council Approves Budget",
-    "summary": "The Hudson City Council approved a $50M budget.",
-    "publication_date": "2025-08-14",
-    "link": "https://hudson.com/budget-approval",
-    "flair": "Local News"
-  }]
+    "news": [{
+        "headline": "Hudson Council Approves Budget",
+        "summary": "The Hudson City Council approved a $50M budget.",
+        "publication_date": "2025-08-14",
+        "link": "https://hudson.com/budget-approval",
+        "flair": "Local News"
+    }]
 }"""
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
@@ -538,7 +534,6 @@ class TestResponseParsing:
     @pytest.fixture
     def aggregator(self, temp_prompts_dir: Path) -> NewsAggregator:
         config = MagicMock(spec=Config)
-        config.system_prompt = "Test"
         config.max_articles = 10
         config.perplexity_api_key = "test-api-key"
         config.llm_base_url = "https://api.test.com"

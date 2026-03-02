@@ -387,7 +387,7 @@ class DuplicationChecker:
 
             cursor.execute(
                 """
-                INSERT INTO submitted_urls 
+                INSERT INTO submitted_urls
                 (url, url_hash, normalized_url, title, title_hash, submission_id, submitted_at, source)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,

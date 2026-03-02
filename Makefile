@@ -1,5 +1,5 @@
 # Hudson News Bot Makefile
-# 
+#
 # This Makefile provides convenient shortcuts for common development tasks.
 # Run 'make help' to see all available commands.
 

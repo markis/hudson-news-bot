@@ -32,12 +32,14 @@ def test_news_config_structure():
     hints = get_type_hints(NewsConfig)
 
     assert "max_articles" in hints
-    assert "system_prompt" in hints
     assert "news_sites" in hints
+    assert "skip_recently_scraped" in hints
+    assert "scraping_cache_hours" in hints
 
     assert hints["max_articles"] is int
-    assert hints["system_prompt"] is str
     assert hints["news_sites"] == list[str]
+    assert hints["skip_recently_scraped"] is bool
+    assert hints["scraping_cache_hours"] is int
 
 
 def test_reddit_config_structure():
@@ -88,11 +90,13 @@ def test_default_config_matches_typeddict():
 
     # Check news config
     assert "max_articles" in DEFAULT_CONFIG["news"]
-    assert "system_prompt" in DEFAULT_CONFIG["news"]
     assert "news_sites" in DEFAULT_CONFIG["news"]
+    assert "skip_recently_scraped" in DEFAULT_CONFIG["news"]
+    assert "scraping_cache_hours" in DEFAULT_CONFIG["news"]
     assert isinstance(DEFAULT_CONFIG["news"]["max_articles"], int)
-    assert isinstance(DEFAULT_CONFIG["news"]["system_prompt"], str)
     assert isinstance(DEFAULT_CONFIG["news"]["news_sites"], list)
+    assert isinstance(DEFAULT_CONFIG["news"]["skip_recently_scraped"], bool)
+    assert isinstance(DEFAULT_CONFIG["news"]["scraping_cache_hours"], int)
 
     # Check reddit config
     assert "subreddit" in DEFAULT_CONFIG["reddit"]

@@ -24,33 +24,33 @@ and includes de-duplication capabilities to prevent duplicate posts.
 
 1. **Clone the repository**:
 
-   ```bash
-   git clone <repository-url>
-   cd hudson-news-bot
-   ```
+    ```bash
+    git clone <repository-url>
+    cd hudson-news-bot
+    ```
 
 2. **Install dependencies**:
 
-   ```bash
-   make install-dev
-   ```
+    ```bash
+    make install-dev
+    ```
 
 3. **Set up environment variables**:
 
-   ```bash
-   cp .env.example .env
-   # Edit .env with your API credentials
-   ```
+    ```bash
+    cp .env.example .env
+    # Edit .env with your API credentials
+    ```
 
 4. **Configure Reddit API**:
-   - Go to <https://www.reddit.com/prefs/apps>
-   - Create a new application
-   - Add client ID and secret to your `.env` file
+    - Go to <https://www.reddit.com/prefs/apps>
+    - Create a new application
+    - Add client ID and secret to your `.env` file
 
 5. **Configure LLM API**:
-   - Get your API key from [OpenCode Zen](https://opencode.ai/auth)
-   - Add it to your `.env` file as `LLM_API_KEY`
-   - Or use `PERPLEXITY_API_KEY` for backward compatibility with Perplexity
+    - Get your API key from [OpenCode Zen](https://opencode.ai/auth)
+    - Add it to your `.env` file as `LLM_API_KEY`
+    - Or use `PERPLEXITY_API_KEY` for backward compatibility with Perplexity
 
 ## Usage
 

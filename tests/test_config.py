@@ -16,7 +16,6 @@ class TestConfig:
         config_content = """
 [news]
 max_articles = 10
-system_prompt = "Test prompt"
 
 [reddit]
 subreddit = "test"
@@ -42,7 +41,6 @@ path = "test.db"
                 config = Config(f.name)
 
                 assert config.max_articles == 10
-                assert config.system_prompt == "Test prompt"
                 assert config.subreddit_name == "test"
                 assert config.reddit_user_agent == "test-bot/1.0"
                 assert config.check_for_duplicates is False
@@ -229,7 +227,6 @@ system_prompt = "Test prompt"
         config_content = """
 [news]
 max_articles = 0
-system_prompt = ""
 """
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
@@ -244,6 +241,5 @@ system_prompt = ""
                 assert any(
                     "max_articles must be greater than 0" in error for error in errors
                 )
-                assert any("system_prompt cannot be empty" in error for error in errors)
             finally:
                 Path(f.name).unlink()

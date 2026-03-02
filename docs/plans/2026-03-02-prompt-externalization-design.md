@@ -273,27 +273,27 @@ IMPORTANT:
 **Unit Tests (add to `tests/test_aggregator.py`):**
 
 1. **Test template loading:**
-   - Valid templates load successfully
-   - Missing template raises `ValueError`
-   - Invalid template syntax raises descriptive error
+    - Valid templates load successfully
+    - Missing template raises `ValueError`
+    - Invalid template syntax raises descriptive error
 
 2. **Test rendering with full context:**
-   - All variables provided (articles, flair_options)
-   - Output contains expected article data
-   - Flair section appears correctly
+    - All variables provided (articles, flair_options)
+    - Output contains expected article data
+    - Flair section appears correctly
 
 3. **Test rendering with minimal context:**
-   - No flair_options provided
-   - Flair section omitted from output
-   - No undefined variable errors
+    - No flair_options provided
+    - Flair section omitted from output
+    - No undefined variable errors
 
 4. **Test whitespace handling:**
-   - No excessive newlines in output
-   - Clean formatting around conditionals
+    - No excessive newlines in output
+    - Clean formatting around conditionals
 
 5. **Test article truncation:**
-   - >20 articles only uses first 20
-   - Content truncated to 500 chars
+    - >20 articles only uses first 20
+    - Content truncated to 500 chars
 
 **Integration Test:**
 - Mock `WebsiteScraper` with sample articles

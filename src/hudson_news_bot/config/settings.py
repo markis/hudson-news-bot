@@ -14,7 +14,6 @@ class NewsConfig(TypedDict):
     """Configuration for news aggregation."""
 
     max_articles: int
-    system_prompt: str
     news_sites: list[str]
     skip_recently_scraped: bool
     scraping_cache_hours: int
@@ -53,45 +52,9 @@ class ConfigDict(TypedDict):
     database: DatabaseConfig
 
 
-DEFAULT_SYSTEM_PROMPT: Final = """
-You are an article analysis bot focused on Hudson, Ohio.
-Your job is to analyze provided articles and determine if each article is directly about Hudson, Ohio (city, government, schools, roads, events, businesses, public safety, infrastructure). Exclude or ignore articles not explicitly related to Hudson, Ohio.
-You must strictly follow all constraints and output requirements.
-
-Requirements
-- Scope: Only include articles about Hudson, Ohio. Any article that is not clearly and primarily about Hudson, Ohio must be excluded.
-- Time window: Only consider articles published in the last 24 hours. Verify publication dates from the provided content.
-- Processing:
-  1) Analyze the provided article text to determine if the article is about Hudson, Ohio. Use explicit mentions in the title/body/section tags.
-  2) Validate the publication date is within the last 24 hours in the local (Hudson, Ohio) timezone.
-- Extraction:
-  - headline: From or on-page headline (prefer h1). Remove site name suffixes.
-  - summary: 2–3 sentences covering the main facts (who/what/where/when). No opinions or boilerplate text.
-  - publication_date: Normalize to YYYY-MM-DD format from the article’s timestamp; if only time is shown, infer the date from local time.
-  - link: Canonical, final URL of the article.
-- Output:
-  - Produce only valid TOML in this exact format for each story:
-    [[news]]
-    headline = "story headline"
-    summary = "brief summary"
-    publication_date = "2025-08-12"
-    link = "https://source.com/article"
-  - If NO qualifying articles are found, output exactly:
-    [[news]]
-- Limits:
-  - No duplicates—de-duplicate syndicated/reposted content by selecting the original or authoritative source.
-- Quality:
-  - Confirm dates are within the last 24 hours and use the correct date format.
-  - Only publish news with explicit Hudson, Ohio ties.
-  - Output must be valid TOML that parses with no errors.
-- Failure mode:
-  - If no qualifying articles are found after processing all provided articles, output exactly:
-    [[news]]
-"""
 DEFAULT_CONFIG: Final[ConfigDict] = {
     "news": {
         "max_articles": 5,
-        "system_prompt": DEFAULT_SYSTEM_PROMPT,
         "news_sites": [
             "https://www.beaconjournal.com/communities/hudsonhubtimes/",
             "https://fox8.com/tag/hudson-news/",
@@ -156,11 +119,6 @@ class Config:
     def max_articles(self) -> int:
         """Get maximum number of articles to aggregate."""
         return int(self._data.get("news", {}).get("max_articles", 5))
-
-    @cached_property
-    def system_prompt(self) -> str:
-        """Get LLM system prompt for news aggregation."""
-        return str(self._data.get("news", {}).get("system_prompt", ""))
 
     @cached_property
     def reddit_user_agent(self) -> str:
@@ -283,9 +241,6 @@ class Config:
         # Validate config values
         if self.max_articles <= 0:
             errors.append("max_articles must be greater than 0")
-
-        if not self.system_prompt.strip():
-            errors.append("system_prompt cannot be empty")
 
         return len(errors) == 0, errors
 

@@ -680,8 +680,8 @@ class WebsiteScraper:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT scraped_at, scrape_success 
-                FROM scraped_articles 
+                SELECT scraped_at, scrape_success
+                FROM scraped_articles
                 WHERE url_hash = ? AND scraped_at > ?
             """,
                 (url_hash, cutoff_time),
