@@ -1,3 +1,5 @@
+![hudson-news-banner](https://github.com/user-attachments/assets/aaa0d1cb-f596-43fb-8531-7d6876c544cb)
+
 # Hudson News Bot
 
 A Python news aggregation bot that integrates with Reddit using LLM APIs.
